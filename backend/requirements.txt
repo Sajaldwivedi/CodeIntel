@@ -8,3 +8,7 @@ chromadb
 sentence-transformers
 google-generativeai
 python-dotenv
+tree-sitter
+tree-sitter-languages; python_version < "3.12"
+tree-sitter-javascript; python_version >= "3.12"
+tree-sitter-typescript; python_version >= "3.12"

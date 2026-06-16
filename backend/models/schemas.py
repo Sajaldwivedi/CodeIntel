@@ -17,6 +17,20 @@ class IndexRepositoryRequest(BaseModel):
 class IndexRepositoryResponse(BaseModel):
     status: str
     chunks_indexed: int
+    entities_indexed: int
+
+
+class StructureRepositoryRequest(BaseModel):
+    repo_name: str = Field(..., description="Cloned repository name")
+
+
+class StructureRepositoryResponse(BaseModel):
+    repo_name: str
+    classes: int
+    functions: int
+    methods: int
+    imports: int
+    sample_entities: list[dict[str, str | int]]
 
 
 class ChatRequest(BaseModel):
