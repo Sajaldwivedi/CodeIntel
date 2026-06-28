@@ -5,19 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
+    "@xyflow/react": "^12.11.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.42.0",
+    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.0",
-    "zustand": "^5.0.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0",
-    "lucide-react": "^0.468.0"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
