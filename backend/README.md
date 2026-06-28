@@ -1,79 +1,48 @@
-# Backend Setup (Phase 1)
+# Backend
 
-Phase 1 adds repository cloning, indexing, and RAG chat over codebases.
+FastAPI application following **clean architecture**. The backend ingests GitHub repositories, parses source code with Tree-Sitter, generates embeddings, builds dependency graphs in Neo4j, and serves agentic analysis via LangGraph.
 
-## 1) Create a virtual environment
+## Layer Responsibilities
 
-```bash
-python -m venv venv
+| Layer            | Responsibility                                      |
+|------------------|-----------------------------------------------------|
+| `api/`           | HTTP routes, request validation, response mapping   |
+| `services/`      | Business logic and use-case orchestration           |
+| `repositories/`  | Data access adapters (ChromaDB, Neo4j, GitHub)      |
+| `models/`        | Domain entities and value objects                   |
+| `schemas/`       | Pydantic DTOs for API contracts                     |
+| `core/`          | Config, LLM clients, logging, middleware            |
+| `workers/`       | Async background jobs (clone, index, re-embed)      |
+| `graph/`         | LangGraph agent workflows and tools                 |
+| `parser/`        | Tree-Sitter AST parsing and metadata extraction     |
+| `embeddings/`    | Code chunking and vector generation                 |
+
+## Dependency Flow
+
+```
+api → services → repositories
+              → graph
+              → parser
+              → embeddings
+              → workers (async)
 ```
 
-## 2) Activate the virtual environment
+**Rule:** Inner layers never import from outer layers. `repositories` and `services` must not import from `api`.
 
-Windows:
+## Python Version
 
-```powershell
-venv\Scripts\activate
-```
+Python **3.11+**
 
-Linux/Mac:
+## Local Development
 
 ```bash
-source venv/bin/activate
-```
-
-## 3) Install dependencies
-
-```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-## 4) Configure environment variables
+## Environment
 
-Set `GEMINI_API_KEY` in `.env`:
-
-```env
-GEMINI_API_KEY=YOUR_KEY
-```
-
-## 5) Run the server
-
-```bash
-uvicorn app:app --reload
-```
-
-API base URL:
-
-http://127.0.0.1:8000
-
-## 6) Test the Phase 1 workflow
-
-### Clone repository
-
-`POST /repository/clone`
-
-```json
-{
-  "repo_url": "https://github.com/user/project"
-}
-```
-
-### Index repository
-
-`POST /repository/index`
-
-```json
-{
-  "repo_name": "project"
-}
-```
-
-### Ask codebase question
-
-`POST /chat`
-
-```json
-{
-  "question": "How does authentication work?"
-}
-```
+See root `.env.example` for all required variables.

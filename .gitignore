@@ -1,0 +1,56 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data & runtime
+data/
+repos/
+embeddings/
+*.sqlite3
+*.log
+
+# ChromaDB / Neo4j local volumes (keep compose-managed)
+chroma_data/
+neo4j_data/
+
+# LangSmith / secrets
+*.pem
+credentials.json
+
+# Docker
+.docker/

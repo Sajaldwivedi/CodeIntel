@@ -1,1 +1,1 @@
-"""Pydantic schemas for API request and response payloads."""
+# Package: models
