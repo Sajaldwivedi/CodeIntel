@@ -1,6 +1,7 @@
 import {
   GitBranch,
   LayoutDashboard,
+  Layers,
   MessagesSquare,
   Network,
   Settings,
@@ -23,7 +24,8 @@ export const navItems: NavItem[] = [
   { label: "Upload Repository", to: "/upload", icon: UploadCloud, shortcut: "G U" },
   { label: "Repository", to: "/repository", icon: GitBranch, shortcut: "G R" },
   { label: "Chat", to: "/chat", icon: MessagesSquare, shortcut: "G C" },
-  { label: "Architecture", to: "/architecture", icon: Workflow, shortcut: "G A" },
+  { label: "Diagrams", to: "/diagrams", icon: Workflow, shortcut: "G A" },
+  { label: "Architecture", to: "/architecture", icon: Layers, shortcut: "G H" },
   { label: "Dependencies", to: "/dependencies", icon: Network, shortcut: "G P" },
   { label: "Settings", to: "/settings", icon: Settings, shortcut: "G S" },
 ];

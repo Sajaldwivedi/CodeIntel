@@ -271,3 +271,116 @@ class GraphQueryEngine:
             }
             for row in rows
         ]
+
+    def list_database_tables(self, repo_id: str, *, limit: int = 30) -> list[dict[str, str]]:
+        """Return database table nodes for a repository."""
+        rows = self._graph.run(
+            """
+            MATCH (t:DatabaseTable {repo_id: $repo_id})
+            RETURN t.name AS name,
+                   coalesce(t.file_path, '') AS file_path
+            ORDER BY t.name
+            LIMIT $limit
+            """,
+            {"repo_id": repo_id, "limit": limit},
+        )
+        return [
+            {
+                "name": row.get("name") or "",
+                "file_path": row.get("file_path") or "",
+            }
+            for row in rows
+        ]
+
+    def get_import_graph(self, repo_id: str, *, limit: int = 100) -> dict[str, list[dict[str, str]]]:
+        """Return file-level import nodes and edges for dependency visualization."""
+        rows = self._graph.run(
+            """
+            MATCH (source:File {repo_id: $repo_id})-[r:IMPORTS]->(target)
+            RETURN source.path AS source_path,
+                   coalesce(target.path, target.name, target.module, target.id) AS target_path,
+                   head(labels(target)) AS target_label
+            LIMIT $limit
+            """,
+            {"repo_id": repo_id, "limit": limit},
+        )
+        nodes: dict[str, dict[str, str]] = {}
+        edges: list[dict[str, str]] = []
+
+        def _group(path: str, label: str = "File") -> str:
+            lowered = path.lower()
+            if label == "ExternalLibrary":
+                return "external"
+            if any(x in lowered for x in ("route", "controller", "api/", "handler")):
+                return "api"
+            if "service" in lowered:
+                return "service"
+            if any(x in lowered for x in ("util", "helper", "config")):
+                return "util"
+            return "core"
+
+        for row in rows:
+            src = row.get("source_path") or ""
+            tgt = row.get("target_path") or ""
+            tgt_label = row.get("target_label") or "File"
+            if not src or not tgt:
+                continue
+            src_id = f"file:{src}"
+            tgt_id = f"{'lib' if tgt_label == 'ExternalLibrary' else 'file'}:{tgt}"
+            nodes[src_id] = {"id": src_id, "path": src, "label": _basename(src), "group": _group(src)}
+            nodes[tgt_id] = {
+                "id": tgt_id,
+                "path": tgt,
+                "label": _basename(tgt),
+                "group": _group(tgt, tgt_label),
+            }
+            edges.append({"source": src_id, "target": tgt_id, "label": "imports"})
+
+        return {"nodes": list(nodes.values()), "edges": edges}
+
+    def get_class_structure(self, repo_id: str, *, limit: int = 30) -> dict[str, list[dict]]:
+        """Return class nodes, methods, and inheritance relationships."""
+        class_rows = self._graph.run(
+            """
+            MATCH (c:Class {repo_id: $repo_id})
+            OPTIONAL MATCH (c)-[:DEFINES]->(m:Method)
+            RETURN c.name AS name,
+                   coalesce(c.file_path, '') AS file_path,
+                   collect(DISTINCT m.name)[..8] AS methods
+            ORDER BY c.name
+            LIMIT $limit
+            """,
+            {"repo_id": repo_id, "limit": limit},
+        )
+        rel_rows = self._graph.run(
+            """
+            MATCH (c:Class {repo_id: $repo_id})-[r:EXTENDS|IMPLEMENTS]->(parent)
+            RETURN c.name AS source,
+                   parent.name AS target,
+                   type(r) AS type
+            LIMIT $limit
+            """,
+            {"repo_id": repo_id, "limit": limit * 2},
+        )
+        return {
+            "classes": [
+                {
+                    "name": row.get("name") or "",
+                    "file_path": row.get("file_path") or "",
+                    "methods": list(row.get("methods") or []),
+                }
+                for row in class_rows
+            ],
+            "relationships": [
+                {
+                    "source": row.get("source") or "",
+                    "target": row.get("target") or "",
+                    "type": row.get("type") or "",
+                }
+                for row in rel_rows
+            ],
+        }
+
+
+def _basename(path: str) -> str:
+    return path.replace("\\", "/").rsplit("/", 1)[-1] if path else path

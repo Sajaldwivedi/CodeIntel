@@ -6,6 +6,7 @@ import { ArchitecturePage } from "@/pages/ArchitecturePage";
 import { ChatPage } from "@/pages/ChatPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DependencyGraphPage } from "@/pages/DependencyGraphPage";
+import { DiagramsPage } from "@/pages/DiagramsPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RepositoryOverviewPage } from "@/pages/RepositoryOverviewPage";
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/architecture" element={<ArchitecturePage />} />
             <Route path="/dependencies" element={<DependencyGraphPage />} />
+            <Route path="/diagrams" element={<DiagramsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
