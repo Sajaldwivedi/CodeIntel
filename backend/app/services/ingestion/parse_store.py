@@ -15,6 +15,9 @@ def save_parse_results(
     parsed_files: list[ParsedFile],
     *,
     extra: dict[str, Any] | None = None,
+    owner: str | None = None,
+    name: str | None = None,
+    repo_id: str | None = None,
 ) -> Path:
     """Write parsed file structures as JSON for downstream indexing."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -22,6 +25,12 @@ def save_parse_results(
         "job_id": job_id,
         "files": [pf.to_dict() for pf in parsed_files],
     }
+    if owner:
+        payload["owner"] = owner
+    if name:
+        payload["name"] = name
+    if repo_id:
+        payload["repo_id"] = repo_id
     if extra:
         payload["summary"] = extra
     out_path = output_dir / f"{job_id}.json"

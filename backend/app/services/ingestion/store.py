@@ -67,6 +67,24 @@ class IngestionJob:
             "updated_at": self.updated_at.isoformat(),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> IngestionJob:
+        created = data.get("created_at")
+        updated = data.get("updated_at")
+        return cls(
+            id=data["id"],
+            source=data["source"],
+            owner=data["owner"],
+            name=data["name"],
+            stage=IngestionStage(data["stage"]),
+            progress=int(data.get("progress", 0)),
+            message=data.get("message", ""),
+            error=data.get("error"),
+            metadata=data.get("metadata") or {},
+            created_at=datetime.fromisoformat(created) if isinstance(created, str) else datetime.now(UTC),
+            updated_at=datetime.fromisoformat(updated) if isinstance(updated, str) else datetime.now(UTC),
+        )
+
     def update(
         self,
         *,
@@ -90,6 +108,16 @@ class IngestionJob:
             self.metadata.update(metadata)
         self.updated_at = datetime.now(UTC)
         self._notify()
+        self._persist()
+
+    def _persist(self) -> None:
+        try:
+            from app.core.config import get_settings
+            from app.services.ingestion.job_store import save_job_snapshot
+
+            save_job_snapshot(get_settings().ingestion_workspace_path, self)
+        except Exception:
+            pass
 
     def _notify(self) -> None:
         payload = self.to_dict()
@@ -132,7 +160,26 @@ class IngestionStore:
 
     async def get_job(self, job_id: str) -> IngestionJob | None:
         async with self._lock:
-            return self._jobs.get(job_id)
+            job = self._jobs.get(job_id)
+            if job is not None:
+                return job
+
+        try:
+            from app.core.config import get_settings
+            from app.services.ingestion.job_store import load_job_snapshot
+
+            loaded = load_job_snapshot(get_settings().ingestion_workspace_path, job_id)
+            if loaded is None:
+                return None
+            async with self._lock:
+                self._jobs[job_id] = loaded
+                return loaded
+        except Exception:
+            return None
+
+    async def remember_job(self, job: IngestionJob) -> None:
+        async with self._lock:
+            self._jobs[job.id] = job
 
     async def list_jobs(self) -> list[IngestionJob]:
         async with self._lock:

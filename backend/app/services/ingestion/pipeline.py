@@ -170,11 +170,14 @@ class IngestionPipeline:
             )
 
         file_entries = [(f.path, f.language) for f in scan.files]
-        parsed_files, chunks, parse_summary = await asyncio.to_thread(
+        parsed_files, chunks, parse_summary, sources = await asyncio.to_thread(
             _run_tree_sitter_parse,
             work_dir,
             file_entries,
             job.id,
+            job.owner,
+            job.name,
+            f"{job.owner}/{job.name}",
             parse_output_dir(self._settings.ingestion_workspace_path),
         )
 
@@ -188,19 +191,28 @@ class IngestionPipeline:
             progress=75,
             message=f"Indexed {parse_summary.symbol_count} symbols across {parse_summary.files_parsed} files…",
         )
-        await asyncio.sleep(0.3)
 
         job.update(
             stage=IngestionStage.EMBEDDING,
-            progress=90,
-            message="Preparing embedding pipeline (skipped — no AI wired yet)…",
+            progress=85,
+            message="Generating embeddings and storing in ChromaDB…",
         )
-        await asyncio.sleep(0.4)
+
+        repo_slug = f"{job.owner}/{job.name}"
+        embed_summary = await asyncio.to_thread(
+            _run_embedding_index,
+            repo_slug,
+            parsed_files,
+            sources,
+            self._settings,
+        )
 
         languages = scan.language_percentages()
+        total_embedded = embed_summary.chunks_embedded
         result_metadata: dict[str, Any] = {
             "owner": job.owner,
             "name": job.name,
+            "repo_id": repo_slug,
             "branch": branch,
             "commit_hash": commit_hash,
             "file_count": scan.file_count,
@@ -211,6 +223,12 @@ class IngestionPipeline:
             "symbol_count": parse_summary.symbol_count,
             "api_endpoint_count": parse_summary.api_endpoint_count,
             "files_parsed": parse_summary.files_parsed,
+            "embeddings_indexed": total_embedded,
+            "embeddings_new": embed_summary.chunks_indexed,
+            "embeddings_skipped": embed_summary.chunks_skipped,
+            "embeddings_deleted": embed_summary.chunks_deleted,
+            "embedding_provider": embed_summary.provider,
+            "chroma_collection": embed_summary.collection,
             "description": (
                 github_metadata.description
                 if github_metadata
@@ -220,10 +238,19 @@ class IngestionPipeline:
             "forks": github_metadata.forks if github_metadata else 0,
         }
 
+        if total_embedded < parse_summary.chunk_count:
+            raise ValidationError(
+                f"Embedding incomplete ({total_embedded}/{parse_summary.chunk_count} chunks indexed). "
+                "Retry ingestion to continue.",
+            )
+
         job.update(
             stage=IngestionStage.COMPLETED,
             progress=100,
-            message=f"Successfully ingested {scan.file_count} files ({parse_summary.chunk_count} chunks).",
+            message=(
+                f"Successfully ingested {scan.file_count} files "
+                f"({total_embedded} embeddings in ChromaDB)."
+            ),
             metadata=result_metadata,
         )
 
@@ -236,16 +263,26 @@ def _run_tree_sitter_parse(
     work_dir: Path,
     file_entries: list[tuple[str, str]],
     job_id: str,
+    owner: str,
+    name: str,
+    repo_id: str,
     parse_output_dir: Path,
 ):
     from services.parser import ParserService
 
     parser = ParserService()
     parsed_files, chunks, summary = parser.parse_repository(work_dir, file_entries)
+    sources = {
+        pf.file: (work_dir / pf.file).read_text(encoding="utf-8", errors="replace")
+        for pf in parsed_files
+    }
     save_parse_results(
         parse_output_dir,
         job_id,
         parsed_files,
+        owner=owner,
+        name=name,
+        repo_id=repo_id,
         extra={
             "chunk_count": summary.chunk_count,
             "symbol_count": summary.symbol_count,
@@ -254,4 +291,73 @@ def _run_tree_sitter_parse(
             "files_skipped": summary.files_skipped,
         },
     )
-    return parsed_files, chunks, summary
+    return parsed_files, chunks, summary, sources
+
+
+def _run_embedding_index(
+    repo_id: str,
+    parsed_files: list,
+    sources: dict[str, str],
+    settings: Settings,
+):
+    from services.embeddings import EmbeddingIndexer
+    from services.embeddings.providers import EmbeddingProviderError
+
+    if settings.embedding_provider == "openai" and not settings.openai_api_key:
+        raise ValidationError(
+            "OPENAI_API_KEY is required for embeddings. Set it in .env or switch EMBEDDING_PROVIDER.",
+        )
+    if settings.embedding_provider == "gemini" and not settings.gemini_api_key:
+        raise ValidationError(
+            "GEMINI_API_KEY is required for embeddings. Set it in .env or switch EMBEDDING_PROVIDER.",
+        )
+
+    try:
+        indexer = EmbeddingIndexer(
+            provider_name=settings.embedding_provider,
+            openai_api_key=settings.openai_api_key,
+            gemini_api_key=settings.gemini_api_key,
+            gemini_model=settings.gemini_model,
+            gemini_request_delay_seconds=settings.gemini_request_delay_seconds,
+            chroma_host=settings.chroma_host if settings.chroma_use_http else None,
+            chroma_port=settings.chroma_port if settings.chroma_use_http else None,
+            chroma_persistent_path=settings.chroma_persistent_path_resolved,
+            collection_name=settings.chroma_collection,
+            manifest_dir=settings.embedding_manifest_dir,
+            batch_size=settings.embedding_batch_size,
+            class_line_threshold=settings.class_line_threshold,
+            rate_limit_retries=settings.embedding_rate_limit_retries,
+            gemini_max_retries=settings.gemini_max_retries,
+        )
+    except EmbeddingProviderError as exc:
+        raise ValidationError(str(exc)) from exc
+
+    try:
+        return indexer.index_repository(repo_id, parsed_files, sources)
+    except Exception as exc:
+        message = str(exc).lower()
+        if (
+            "insufficient_quota" in message
+            or "exceeded your current quota" in message
+            or "429" in message
+            or "resourceexhausted" in message
+        ):
+            provider = settings.embedding_provider
+            if provider == "gemini":
+                raise ValidationError(
+                    "Gemini rate limit hit (requests per minute), not your daily quota. "
+                    "Wait 1–2 minutes and retry ingestion — already-indexed chunks are saved.",
+                ) from exc
+            raise ValidationError(
+                "OpenAI API quota exceeded. Add billing at platform.openai.com or switch "
+                "to EMBEDDING_PROVIDER=gemini.",
+            ) from exc
+        if "invalid_api_key" in message or "incorrect api key" in message:
+            raise ValidationError("Invalid OpenAI API key. Check OPENAI_API_KEY in .env.") from exc
+        if "api key not valid" in message or "api_key_invalid" in message:
+            raise ValidationError("Invalid Gemini API key. Check GEMINI_API_KEY in .env.") from exc
+        if "not found for api version" in message and "embed" in message:
+            raise ValidationError(
+                "Gemini embedding model unavailable. Set GEMINI_MODEL=models/gemini-embedding-001 in .env.",
+            ) from exc
+        raise

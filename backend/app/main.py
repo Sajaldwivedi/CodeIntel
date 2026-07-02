@@ -7,6 +7,8 @@ time beyond building the instance itself.
 
 from __future__ import annotations
 
+import app.bootstrap  # noqa: F401  # must run before services.* imports
+
 from fastapi import FastAPI
 
 from app.api.router import api_router

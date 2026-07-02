@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   Database,
   FileCode2,
   FolderGit2,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { getIngestionStatus } from "@/api/ingestion";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { FileTree } from "@/components/common/FileTree";
@@ -31,13 +33,34 @@ export function RepositoryOverviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const selectedId = useRepoStore((s) => s.selectedRepoId);
+  const updateFromIngestion = useRepoStore((s) => s.updateFromIngestion);
   const repo = useRepoStore(
     (s) => s.repositories.find((r) => r.id === (id ?? selectedId)) ?? null,
   );
   const [selectedFile, setSelectedFile] = useState<string>();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const canLoadParse = repo?.status === "indexed";
+  const canLoadParse = repo?.status === "indexed" || repo?.status === "failed";
   const { data: parseData, error, loading, refetch } = useParseResults(repo?.id ?? null, canLoadParse);
+
+  useEffect(() => {
+    if (!repo?.id) return;
+    let cancelled = false;
+    setRefreshing(true);
+    getIngestionStatus(repo.id)
+      .then((job) => {
+        if (!cancelled) updateFromIngestion(job);
+      })
+      .catch(() => {
+        // Parse data may still load even when the job record is unavailable.
+      })
+      .finally(() => {
+        if (!cancelled) setRefreshing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repo?.id, updateFromIngestion]);
 
   const fileTree = parseData ? buildFileTreeFromParse(parseData.files) : [];
   const languages = parseData ? languageBreakdownFromParse(parseData.files) : [];
@@ -54,6 +77,10 @@ export function RepositoryOverviewPage() {
       />
     );
   }
+
+  const semanticChunks = summary?.chunk_count ?? repo.semanticChunks ?? 0;
+  const embeddedChunks = repo.embeddingsIndexed ?? repo.chunks ?? 0;
+  const filesCount = summary?.files_parsed ?? repo.files;
 
   return (
     <div className="space-y-8">
@@ -88,10 +115,32 @@ export function RepositoryOverviewPage() {
 
       <p className="max-w-2xl text-muted-foreground">{repo.description}</p>
 
+      {repo.status === "failed" && repo.ingestionError && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">Indexing incomplete</p>
+            <p className="mt-1 text-amber-100/80">{repo.ingestionError}</p>
+            {embeddedChunks > 0 && semanticChunks > embeddedChunks && (
+              <p className="mt-2 text-amber-100/80">
+                {embeddedChunks} of {semanticChunks} chunks are embedded. Re-ingest from Upload to continue.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <motion.div variants={staggerContainer(0.06)} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Files", value: formatCompact(summary?.files_parsed ?? repo.files), icon: FileCode2 },
-          { label: "Chunks", value: formatCompact(summary?.chunk_count ?? repo.chunks), icon: Database },
+          { label: "Files", value: formatCompact(filesCount), icon: FileCode2 },
+          {
+            label: "Embedded",
+            value:
+              semanticChunks > 0 && embeddedChunks < semanticChunks
+                ? `${formatCompact(embeddedChunks)}/${formatCompact(semanticChunks)}`
+                : formatCompact(embeddedChunks || semanticChunks),
+            icon: Database,
+          },
           { label: "Symbols", value: formatCompact(summary?.symbol_count ?? 0), icon: Workflow },
           { label: "API routes", value: formatCompact(summary?.api_endpoint_count ?? 0), icon: GitFork },
         ].map((s) => (
@@ -122,7 +171,7 @@ export function RepositoryOverviewPage() {
                     <Skeleton key={i} className="h-7 w-full" style={{ width: `${90 - i * 6}%` }} />
                   ))}
                 </div>
-              ) : loading ? (
+              ) : loading || refreshing ? (
                 <div className="space-y-2">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <Skeleton key={i} className="h-7 w-full" style={{ width: `${90 - i * 6}%` }} />

@@ -16,6 +16,9 @@ export interface Repository {
   /** Indexing progress 0-100 (only meaningful while status === "indexing"). */
   progress: number;
   updatedAt: string;
+  ingestionError?: string | null;
+  semanticChunks?: number;
+  embeddingsIndexed?: number;
 }
 
 export interface LanguageBreakdown {

@@ -12,6 +12,10 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Repo-root ``.env`` (works when cwd is ``backend/`` or repo root).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_ENV_FILES = (str(_REPO_ROOT / ".env"), ".env")
+
 
 class Settings(BaseSettings):
     """Strongly-typed application settings.
@@ -21,7 +25,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -46,7 +50,19 @@ class Settings(BaseSettings):
 
     # --- ChromaDB (vector database) ---
     chroma_host: str = "localhost"
-    chroma_port: int = 8000
+    chroma_port: int = 8001
+    chroma_use_http: bool = False
+    chroma_collection: str = "repo_embeddings"
+    chroma_persistent_path: str = "../data/chroma"
+
+    # --- Embeddings ---
+    embedding_provider: str = "openai"
+    embedding_batch_size: int = 32
+    class_line_threshold: int = 80
+    # Pause between Gemini batch API calls (RPM limit, not daily quota).
+    gemini_request_delay_seconds: float = 4.0
+    gemini_max_retries: int = 8
+    embedding_rate_limit_retries: int = 6
 
     # --- Repository ingestion ---
     # Outside ``backend/`` so uvicorn --reload does not restart mid-clone.
@@ -56,6 +72,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    gemini_model: str = "models/gemini-embedding-001"
 
     @property
     def is_production(self) -> bool:
@@ -68,6 +85,17 @@ class Settings(BaseSettings):
         if not path.is_absolute():
             path = (Path.cwd() / path).resolve()
         return path
+
+    @property
+    def chroma_persistent_path_resolved(self) -> Path:
+        path = Path(self.chroma_persistent_path)
+        if not path.is_absolute():
+            path = (Path.cwd() / path).resolve()
+        return path
+
+    @property
+    def embedding_manifest_dir(self) -> Path:
+        return self.ingestion_workspace_path.parent / "embeddings" / "manifests"
 
 
 @lru_cache

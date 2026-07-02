@@ -81,10 +81,23 @@ async def ingest_zip(
     response_model=IngestionJobResponse,
     summary="Get ingestion job status",
 )
-async def get_ingestion_status(job_id: str) -> IngestionJobResponse:
+async def get_ingestion_status(
+    job_id: str,
+    settings: Settings = Depends(get_app_settings),
+) -> IngestionJobResponse:
     """Poll the current status of an ingestion job."""
     store = get_ingestion_store()
     job = await store.get_job(job_id)
+    if job is None:
+        output_dir = parse_output_dir(settings.ingestion_workspace_path)
+        parse_data = load_parse_results(output_dir, job_id)
+        if parse_data is not None:
+            from app.services.ingestion.job_store import job_from_parse_artifact
+
+            recovered = job_from_parse_artifact(settings.ingestion_workspace_path, parse_data)
+            if recovered is not None:
+                await store.remember_job(recovered)
+                job = recovered
     if job is None:
         raise NotFoundError(f"Ingestion job '{job_id}' not found.")
     return IngestionJobResponse(**job.to_dict())
@@ -99,11 +112,6 @@ async def get_parse_results(
     settings: Settings = Depends(get_app_settings),
 ) -> dict:
     """Return structured parse output (functions, classes, imports, chunks metadata)."""
-    store = get_ingestion_store()
-    job = await store.get_job(job_id)
-    if job is None:
-        raise NotFoundError(f"Ingestion job '{job_id}' not found.")
-
     output_dir = parse_output_dir(settings.ingestion_workspace_path)
     data = load_parse_results(output_dir, job_id)
     if data is None:
