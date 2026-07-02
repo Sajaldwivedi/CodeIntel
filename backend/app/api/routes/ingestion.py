@@ -66,7 +66,7 @@ async def ingest_zip(
 
         raise ValidationError(f"Archive exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.")
 
-    upload_dir = Path(settings.ingestion_workspace_dir) / "uploads"
+    upload_dir = settings.ingestion_workspace_path / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
     archive_path = upload_dir / f"{name}-{uuid.uuid4().hex[:8]}.zip"
     archive_path.write_bytes(content)

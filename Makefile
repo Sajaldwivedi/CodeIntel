@@ -31,7 +31,7 @@ backend-install:
 	cd backend && pip install -r requirements.txt -r requirements-dev.txt
 
 backend-dev:
-	cd backend && PYTHONPATH=.. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd backend && PYTHONPATH=.. uvicorn app.main:app --reload --reload-exclude "../data/*" --host 0.0.0.0 --port 8000
 
 frontend-install:
 	cd frontend && npm install

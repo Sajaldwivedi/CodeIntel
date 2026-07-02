@@ -29,6 +29,9 @@ export function toApiErrorMessage(error: unknown): string {
     if (body?.error?.message) {
       return body.error.message;
     }
+    if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+      return `Cannot reach the API at ${baseURL}. Start the backend with: cd backend && uvicorn app.main:app --reload`;
+    }
     return error.message;
   }
   if (error instanceof Error) {

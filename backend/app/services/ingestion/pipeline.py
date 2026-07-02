@@ -19,6 +19,7 @@ from app.services.ingestion.github import (
     fetch_repo_metadata,
     parse_github_url,
 )
+from app.services.ingestion.parse_store import save_parse_results
 from app.services.ingestion.store import IngestionJob, IngestionStage, get_ingestion_store
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class IngestionPipeline:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._store = get_ingestion_store()
-        self._workspace = Path(settings.ingestion_workspace_dir)
+        self._workspace = settings.ingestion_workspace_path
 
     async def start_github_ingestion(
         self,
@@ -159,7 +160,7 @@ class IngestionPipeline:
         commit_hash: str,
         github_metadata: GitHubRepoMetadata | None,
     ) -> None:
-        job.update(stage=IngestionStage.PARSING, message="Scanning and filtering code files…")
+        job.update(stage=IngestionStage.PARSING, message="Parsing code with Tree-sitter…")
         scan = await asyncio.to_thread(scan_repository, work_dir)
 
         if scan.file_count == 0:
@@ -168,10 +169,24 @@ class IngestionPipeline:
                 "The repository may only contain ignored directories.",
             )
 
+        file_entries = [(f.path, f.language) for f in scan.files]
+        parsed_files, chunks, parse_summary = await asyncio.to_thread(
+            _run_tree_sitter_parse,
+            work_dir,
+            file_entries,
+            job.id,
+            self._settings.ingestion_workspace_path.parent / "parsed",
+        )
+
+        job.update(
+            progress=65,
+            message=f"Parsed {parse_summary.files_parsed} files into {parse_summary.chunk_count} semantic chunks…",
+        )
+
         job.update(
             stage=IngestionStage.INDEXING,
             progress=75,
-            message=f"Indexed {scan.file_count} code files…",
+            message=f"Indexed {parse_summary.symbol_count} symbols across {parse_summary.files_parsed} files…",
         )
         await asyncio.sleep(0.3)
 
@@ -192,6 +207,10 @@ class IngestionPipeline:
             "total_size_bytes": scan.total_size_bytes,
             "languages": languages,
             "primary_language": scan.primary_language,
+            "chunk_count": parse_summary.chunk_count,
+            "symbol_count": parse_summary.symbol_count,
+            "api_endpoint_count": parse_summary.api_endpoint_count,
+            "files_parsed": parse_summary.files_parsed,
             "description": (
                 github_metadata.description
                 if github_metadata
@@ -204,10 +223,35 @@ class IngestionPipeline:
         job.update(
             stage=IngestionStage.COMPLETED,
             progress=100,
-            message=f"Successfully ingested {scan.file_count} files.",
+            message=f"Successfully ingested {scan.file_count} files ({parse_summary.chunk_count} chunks).",
             metadata=result_metadata,
         )
 
     def _cleanup_work_dir(self, work_dir: Path) -> None:
         if work_dir.exists():
             shutil.rmtree(work_dir, ignore_errors=True)
+
+
+def _run_tree_sitter_parse(
+    work_dir: Path,
+    file_entries: list[tuple[str, str]],
+    job_id: str,
+    parse_output_dir: Path,
+):
+    from services.parser import ParserService
+
+    parser = ParserService()
+    parsed_files, chunks, summary = parser.parse_repository(work_dir, file_entries)
+    save_parse_results(
+        parse_output_dir,
+        job_id,
+        parsed_files,
+        extra={
+            "chunk_count": summary.chunk_count,
+            "symbol_count": summary.symbol_count,
+            "api_endpoint_count": summary.api_endpoint_count,
+            "files_parsed": summary.files_parsed,
+            "files_skipped": summary.files_skipped,
+        },
+    )
+    return parsed_files, chunks, summary

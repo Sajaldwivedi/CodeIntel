@@ -97,8 +97,9 @@ class TestIngestionApi:
 
 
 class TestZipExtraction:
-    @pytest.mark.asyncio
-    async def test_extract_flatten_single_root(self, tmp_path: Path) -> None:
+    def test_extract_flatten_single_root(self, tmp_path: Path) -> None:
+        import asyncio
+
         from app.services.ingestion.clone import extract_zip_archive
 
         archive = tmp_path / "repo.zip"
@@ -108,5 +109,5 @@ class TestZipExtraction:
             zf.writestr("my-repo/src/app.py", "x = 1")
         archive.write_bytes(buf.getvalue())
 
-        await extract_zip_archive(archive, dest)
+        asyncio.run(extract_zip_archive(archive, dest))
         assert (dest / "src" / "app.py").exists()

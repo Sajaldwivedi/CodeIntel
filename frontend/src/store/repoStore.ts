@@ -1,18 +1,50 @@
 import { create } from "zustand";
 
 import { mockRepositories } from "@/data/mock";
+import type { IngestionJob } from "@/types/ingestion";
 import type { Repository } from "@/types";
 
 interface RepoState {
   repositories: Repository[];
   selectedRepoId: string | null;
   selectRepo: (id: string) => void;
-  /** Adds a repo in an "indexing" state and simulates progress to completion. */
   addRepository: (input: { owner: string; name: string; description?: string }) => Repository;
+  upsertFromIngestion: (job: IngestionJob) => Repository;
+  updateFromIngestion: (job: IngestionJob) => void;
   removeRepository: (id: string) => void;
 }
 
-let progressTimers: Record<string, ReturnType<typeof setInterval>> = {};
+function jobToRepo(job: IngestionJob, existing?: Repository): Repository {
+  const meta = job.metadata;
+  const fileCount = typeof meta.file_count === "number" ? meta.file_count : existing?.files ?? 0;
+  const chunkCount = typeof meta.chunk_count === "number" ? meta.chunk_count : existing?.chunks ?? 0;
+  const primaryLanguage =
+    typeof meta.primary_language === "string" ? meta.primary_language : existing?.language ?? "Unknown";
+  const description =
+    typeof meta.description === "string" && meta.description
+      ? meta.description
+      : existing?.description ?? `Repository ${job.owner}/${job.name}`;
+
+  let status: Repository["status"] = "indexing";
+  if (job.stage === "completed") status = "indexed";
+  else if (job.stage === "failed") status = "failed";
+  else if (job.stage === "queued") status = "queued";
+
+  return {
+    id: job.id,
+    name: job.name,
+    owner: job.owner,
+    description,
+    language: primaryLanguage,
+    stars: typeof meta.stars === "number" ? meta.stars : existing?.stars ?? 0,
+    forks: typeof meta.forks === "number" ? meta.forks : existing?.forks ?? 0,
+    files: fileCount,
+    chunks: chunkCount,
+    status,
+    progress: job.progress,
+    updatedAt: "just now",
+  };
+}
 
 export const useRepoStore = create<RepoState>((set, get) => ({
   repositories: mockRepositories,
@@ -26,47 +58,44 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       name,
       owner,
       description: description || "Imported from GitHub. Indexing in progress…",
-      language: "TypeScript",
+      language: "Unknown",
       stars: 0,
       forks: 0,
       files: 0,
       chunks: 0,
-      status: "indexing",
-      progress: 4,
+      status: "queued",
+      progress: 0,
       updatedAt: "just now",
     };
 
     set((s) => ({ repositories: [repo, ...s.repositories], selectedRepoId: repo.id }));
-
-    // Simulate an indexing pipeline so loading states are demonstrable.
-    progressTimers[repo.id] = setInterval(() => {
-      const current = get().repositories.find((r) => r.id === repo.id);
-      if (!current) {
-        clearInterval(progressTimers[repo.id]);
-        return;
-      }
-      const next = Math.min(100, current.progress + Math.random() * 16 + 6);
-      set((s) => ({
-        repositories: s.repositories.map((r) =>
-          r.id === repo.id
-            ? {
-                ...r,
-                progress: Math.round(next),
-                files: Math.round((next / 100) * 420),
-                chunks: Math.round((next / 100) * 2600),
-                status: next >= 100 ? "indexed" : "indexing",
-              }
-            : r,
-        ),
-      }));
-      if (next >= 100) clearInterval(progressTimers[repo.id]);
-    }, 900);
-
     return repo;
   },
 
+  upsertFromIngestion: (job) => {
+    const existing = get().repositories.find((r) => r.id === job.id);
+    const repo = jobToRepo(job, existing);
+    set((s) => {
+      const exists = s.repositories.some((r) => r.id === job.id);
+      const repositories = exists
+        ? s.repositories.map((r) => (r.id === job.id ? repo : r))
+        : [repo, ...s.repositories];
+      return { repositories, selectedRepoId: job.id };
+    });
+    return repo;
+  },
+
+  updateFromIngestion: (job) => {
+    const existing = get().repositories.find((r) => r.id === job.id);
+    const repo = jobToRepo(job, existing);
+    set((s) => ({
+      repositories: s.repositories.some((r) => r.id === job.id)
+        ? s.repositories.map((r) => (r.id === job.id ? repo : r))
+        : [repo, ...s.repositories],
+    }));
+  },
+
   removeRepository: (id) => {
-    clearInterval(progressTimers[id]);
     set((s) => {
       const repositories = s.repositories.filter((r) => r.id !== id);
       const selectedRepoId =

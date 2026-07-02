@@ -61,7 +61,9 @@ async def clone_repository(
         raise ValidationError(message, details={"stderr": stderr[:500]})
 
     commit_hash = await asyncio.to_thread(_resolve_head, destination)
-    await asyncio.to_thread(_remove_git_dir, destination)
+    # Keep .git on disk; the file scanner ignores it and the workspace is
+    # deleted after ingestion. Removing .git on Windows often fails with
+    # PermissionError on pack files.
     return commit_hash
 
 
@@ -91,8 +93,6 @@ async def extract_zip_archive(archive_path: Path, destination: Path) -> None:
                 shutil.move(str(item), str(destination / item.name))
             inner.rmdir()
 
-        _remove_git_dir(destination)
-
     await asyncio.to_thread(_extract)
 
 
@@ -104,15 +104,6 @@ def _resolve_head(repo_path: Path) -> str:
         check=True,
     )
     return result.stdout.strip()
-
-
-def _remove_git_dir(root: Path) -> None:
-    git_dir = root / ".git"
-    if git_dir.exists():
-        shutil.rmtree(git_dir)
-
-
-def _friendly_clone_error(stderr: str) -> str:
     lowered = stderr.lower()
     if "authentication failed" in lowered or "could not read username" in lowered:
         return "Authentication failed. Provide a valid GitHub token for private repositories."

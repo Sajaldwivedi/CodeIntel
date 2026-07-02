@@ -7,6 +7,7 @@ file). Settings are cached so the object is constructed once per process.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,7 +49,8 @@ class Settings(BaseSettings):
     chroma_port: int = 8000
 
     # --- Repository ingestion ---
-    ingestion_workspace_dir: str = "data/ingestion"
+    # Outside ``backend/`` so uvicorn --reload does not restart mid-clone.
+    ingestion_workspace_dir: str = "../data/ingestion"
 
     # --- LLM provider abstraction (no logic wired yet) ---
     llm_provider: str = "openai"
@@ -58,6 +60,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def ingestion_workspace_path(self) -> Path:
+        """Absolute path to the ingestion working directory."""
+        path = Path(self.ingestion_workspace_dir)
+        if not path.is_absolute():
+            path = (Path.cwd() / path).resolve()
+        return path
 
 
 @lru_cache

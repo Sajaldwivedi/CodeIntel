@@ -11,7 +11,7 @@ from fastapi import FastAPI
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
-from app.core.lifespan import register_lifespan
+from app.core.lifespan import create_lifespan
 from app.core.logging import configure_logging, get_logger
 from app.middleware import register_middleware
 
@@ -37,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.enable_docs else None,
         redoc_url="/redoc" if settings.enable_docs else None,
         openapi_url="/openapi.json" if settings.enable_docs else None,
+        lifespan=create_lifespan(settings),
     )
 
     # Expose settings on app state so request-scoped dependencies resolve the
@@ -45,7 +46,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Order matters: middleware first, then routers.
     register_middleware(app, settings)
-    register_lifespan(app, settings)
     app.include_router(api_router, prefix=settings.api_prefix)
 
     logger.info(
