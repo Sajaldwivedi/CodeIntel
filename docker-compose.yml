@@ -1,0 +1,89 @@
+# Docker Compose orchestration for the AI Software Engineer platform.
+#
+# Services:
+#   - backend   : FastAPI application (app factory)
+#   - frontend  : React + Vite dev server
+#   - neo4j     : Knowledge graph database
+#   - chromadb  : Vector database
+#
+# NOTE: The application code is scaffolding only at this stage. Databases are
+# provisioned so later phases can wire in graph/vector logic without changes
+# to the compose topology.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: rag_backend
+    env_file:
+      - .env
+    environment:
+      # In-cluster addresses override the localhost defaults from .env.
+      - NEO4J_URI=bolt://neo4j:7687
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./services:/app/services
+      - ./shared:/app/shared
+    depends_on:
+      - neo4j
+      - chromadb
+    networks:
+      - ragnet
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: rag_frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Keep container-installed node_modules isolated from the host mount.
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - ragnet
+
+  neo4j:
+    image: neo4j:5.23
+    container_name: rag_neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1G
+    ports:
+      - "7474:7474"   # HTTP browser
+      - "7687:7687"   # Bolt protocol
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - ragnet
+
+  chromadb:
+    image: chromadb/chroma:0.5.20
+    container_name: rag_chromadb
+    ports:
+      - "8001:8000"   # host:container (container listens on 8000)
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ragnet
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  chroma_data:
+
+networks:
+  ragnet:
+    driver: bridge

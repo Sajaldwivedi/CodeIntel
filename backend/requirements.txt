@@ -1,0 +1,5 @@
+# Core runtime dependencies for the FastAPI backend.
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.31
+pydantic>=2.9,<3
+pydantic-settings>=2.5,<3

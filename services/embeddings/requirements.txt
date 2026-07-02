@@ -1,0 +1,2 @@
+# Intended dependencies for the embeddings service (wired in a later phase).
+chromadb>=0.5,<0.6
