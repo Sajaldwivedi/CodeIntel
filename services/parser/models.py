@@ -25,13 +25,25 @@ class ParsedFunction:
 
 
 @dataclass(slots=True)
+class ParsedCall:
+    """A function or method invocation inside a caller symbol."""
+
+    caller: str
+    callee: str
+    receiver: str | None = None
+    start_line: int = 0
+    is_method_call: bool = False
+
+
+@dataclass(slots=True)
 class ParsedClass:
     name: str
     methods: list[ParsedFunction]
     bases: list[str]
-    attributes: list[str]
-    start_line: int
-    end_line: int
+    implements: list[str] = field(default_factory=list)
+    attributes: list[str] = field(default_factory=list)
+    start_line: int = 0
+    end_line: int = 0
     docstring: str | None = None
 
 
@@ -68,6 +80,7 @@ class ParsedFile:
     functions: list[ParsedFunction] = field(default_factory=list)
     imports: list[ParsedImport] = field(default_factory=list)
     api_endpoints: list[ParsedApiEndpoint] = field(default_factory=list)
+    calls: list[ParsedCall] = field(default_factory=list)
     metadata: FileMetadata = field(default_factory=lambda: FileMetadata(complexity="low", lines=0))
 
     def to_dict(self) -> dict[str, Any]:
@@ -80,6 +93,7 @@ class ParsedFile:
                     "name": c.name,
                     "methods": [_function_dict(m) for m in c.methods],
                     "bases": c.bases,
+                    "implements": c.implements,
                     "attributes": c.attributes,
                     "start_line": c.start_line,
                     "end_line": c.end_line,
@@ -98,6 +112,7 @@ class ParsedFile:
                 for i in self.imports
             ],
             "api_endpoints": [asdict(e) for e in self.api_endpoints],
+            "calls": [asdict(c) for c in self.calls],
             "metadata": {
                 "complexity": self.metadata.complexity,
                 "lines": self.metadata.lines,

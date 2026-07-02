@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tree_sitter import Node
 
+from services.parser.calls import extract_javascript_calls, extract_python_calls
 from services.parser.complexity import file_complexity
 from services.parser.frameworks import detect_api_endpoints
 from services.parser.languages.base import LanguageExtractor, is_external_import
@@ -11,6 +12,7 @@ from services.parser.models import (
     FileMetadata,
     Parameter,
     ParsedClass,
+    ParsedCall,
     ParsedFile,
     ParsedFunction,
     ParsedImport,
@@ -72,6 +74,7 @@ class PythonExtractor(LanguageExtractor):
                 imports.extend(_parse_import_from(source, node, repo_root_marker))
 
         symbol_count = len(functions) + sum(len(c.methods) for c in classes) + len(classes)
+        calls = _collect_python_file_calls(source, functions, classes)
         return ParsedFile(
             file=rel_path,
             language=language_label,
@@ -79,6 +82,7 @@ class PythonExtractor(LanguageExtractor):
             functions=functions,
             imports=imports,
             api_endpoints=detect_api_endpoints(self.language, source, root),
+            calls=calls,
             metadata=FileMetadata(
                 complexity=file_complexity(root),
                 lines=count_lines(source),
@@ -233,3 +237,44 @@ def _parse_import_from(source: bytes, node: Node, repo_root_marker: str | None) 
             start_line=start,
         )
     ]
+
+
+def _collect_python_file_calls(
+    source: bytes,
+    functions: list[ParsedFunction],
+    classes: list[ParsedClass],
+) -> list[ParsedCall]:
+    """Re-walk the module AST to attach call sites to parsed symbols."""
+    from services.parser.ts_utils import parse_bytes
+
+    tree = parse_bytes("python", source)
+    if tree is None:
+        return []
+
+    calls: list[ParsedCall] = []
+
+    def walk_defs(node: Node) -> None:
+        if node.type in {"function_definition", "async_function_definition"}:
+            name_node = named_child_by_type(node, "identifier")
+            if name_node is None:
+                return
+            fn_name = node_text(source, name_node)
+            class_name = _enclosing_class_name(node, source)
+            caller = f"{class_name}.{fn_name}" if class_name else fn_name
+            body = child_by_type(node, "block")
+            calls.extend(extract_python_calls(source, caller=caller, body_node=body))
+        for child in node.children:
+            walk_defs(child)
+
+    walk_defs(tree.root_node)
+    return calls
+
+
+def _enclosing_class_name(node: Node, source: bytes) -> str | None:
+    parent = node.parent
+    while parent is not None:
+        if parent.type == "class_definition":
+            name_node = named_child_by_type(parent, "identifier")
+            return node_text(source, name_node) if name_node else None
+        parent = parent.parent
+    return None

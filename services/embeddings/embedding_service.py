@@ -125,6 +125,10 @@ class JinaEmbeddingService(EmbeddingProvider):
         vectors = self.embed_texts([text])
         return vectors[0]
 
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a search query using Jina's ``retrieval.query`` task."""
+        return self._embed_with_task(text, "retrieval.query")
+
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Embed a list of strings, batching internally to minimise API calls.
 
@@ -174,10 +178,28 @@ class JinaEmbeddingService(EmbeddingProvider):
             f"{self._max_retries} attempts.",
         ) from last_exc
 
-    def _request_embeddings(self, batch: list[str]) -> list[list[float]]:
+    def _embed_with_task(self, text: str, task: str) -> list[float]:
+        delay = 1.0
+        last_exc: Exception | None = None
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                return self._request_embeddings([text], task=task)[0]
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt < self._max_retries:
+                    time.sleep(delay)
+                    delay *= self._backoff_base
+        raise JinaEmbeddingError(f"Jina query embedding failed after {self._max_retries} attempts.") from last_exc
+
+    def _request_embeddings(
+        self,
+        batch: list[str],
+        *,
+        task: str | None = None,
+    ) -> list[list[float]]:
         payload: dict[str, object] = {
             "model": self._model,
-            "task": self._task,
+            "task": task or self._task,
             "input": batch,
             # Long code chunks (e.g. package-lock.json modules) can exceed the
             # model's 8192-token limit; Jina returns 400 without this flag.

@@ -136,6 +136,44 @@ class ChromaEmbeddingStore:
         result = self._collection.get(where={"repo_id": repo_id}, include=[])
         return len(result.get("ids") or [])
 
+    def search(
+        self,
+        repo_id: str,
+        query_embedding: list[float],
+        *,
+        top_k: int = 8,
+    ) -> list[dict[str, Any]]:
+        """Return the ``top_k`` most similar chunks for ``repo_id``."""
+        if self.count_repo(repo_id) == 0:
+            return []
+
+        result = self._collection.query(
+            query_embeddings=[query_embedding],
+            n_results=max(1, top_k),
+            where={"repo_id": repo_id},
+            include=["documents", "metadatas", "distances"],
+        )
+
+        ids = (result.get("ids") or [[]])[0]
+        documents = (result.get("documents") or [[]])[0]
+        metadatas = (result.get("metadatas") or [[]])[0]
+        distances = (result.get("distances") or [[]])[0]
+
+        hits: list[dict[str, Any]] = []
+        for idx, chunk_id in enumerate(ids):
+            meta = metadatas[idx] if idx < len(metadatas) else {}
+            distance = float(distances[idx]) if idx < len(distances) else 1.0
+            hits.append(
+                {
+                    "id": chunk_id,
+                    "document": documents[idx] if idx < len(documents) else "",
+                    "metadata": meta or {},
+                    "distance": distance,
+                    "score": max(0.0, 1.0 - distance),
+                },
+            )
+        return hits
+
 
 def _chroma_metadata(chunk: SemanticChunk) -> dict[str, Any]:
     """Chroma metadata values must be scalar types."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tree_sitter import Node
 
+from services.parser.calls import extract_javascript_calls
 from services.parser.complexity import file_complexity
 from services.parser.frameworks import detect_api_endpoints
 from services.parser.languages.base import LanguageExtractor, is_external_import
@@ -11,6 +12,7 @@ from services.parser.models import (
     FileMetadata,
     Parameter,
     ParsedClass,
+    ParsedCall,
     ParsedFile,
     ParsedFunction,
     ParsedImport,
@@ -74,6 +76,7 @@ class JavaScriptExtractor(LanguageExtractor):
 
         symbol_count = len(functions) + sum(len(c.methods) for c in classes) + len(classes)
         ts_lang = "typescript" if language_label.lower() == "typescript" else "javascript"
+        calls = _collect_javascript_file_calls(source, root)
         return ParsedFile(
             file=rel_path,
             language=language_label,
@@ -81,6 +84,7 @@ class JavaScriptExtractor(LanguageExtractor):
             functions=functions,
             imports=imports,
             api_endpoints=detect_api_endpoints(ts_lang, source, root),
+            calls=calls,
             metadata=FileMetadata(
                 complexity=file_complexity(root),
                 lines=count_lines(source),
@@ -149,7 +153,7 @@ def _parse_class(source: bytes, node: Node) -> ParsedClass | None:
     if name_node is None:
         return None
     name = node_text(source, name_node)
-    bases = _parse_bases(source, node)
+    bases, implements = _parse_heritage(source, node)
     methods: list[ParsedFunction] = []
     attributes: list[str] = []
     body = child_by_type(node, "class_body")
@@ -168,6 +172,7 @@ def _parse_class(source: bytes, node: Node) -> ParsedClass | None:
         name=name,
         methods=methods,
         bases=bases,
+        implements=implements,
         attributes=attributes,
         start_line=start,
         end_line=end,
@@ -198,6 +203,30 @@ def _parse_parameters(source: bytes, node: Node) -> list[Parameter]:
 def _parse_return_type(source: bytes, node: Node) -> str | None:
     type_node = child_by_type(node, "type_annotation")
     return node_text(source, type_node).lstrip(": ") if type_node else None
+
+
+def _parse_heritage(source: bytes, node: Node) -> tuple[list[str], list[str]]:
+    clause = child_by_type(node, "class_heritage")
+    if clause is None:
+        return [], []
+    extends: list[str] = []
+    implements: list[str] = []
+    for child in clause.children:
+        if child.type == "extends_clause":
+            extends.extend(
+                node_text(source, c)
+                for c in walk(child)
+                if c.type in {"identifier", "type_identifier"}
+            )
+        elif child.type == "implements_clause":
+            implements.extend(
+                node_text(source, c)
+                for c in walk(child)
+                if c.type in {"identifier", "type_identifier"}
+            )
+    if not extends and not implements:
+        extends = _parse_bases(source, node)
+    return extends, implements
 
 
 def _parse_bases(source: bytes, node: Node) -> list[str]:
@@ -231,3 +260,45 @@ def _parse_import(source: bytes, node: Node, repo_root_marker: str | None) -> li
             start_line=start,
         )
     ]
+
+
+def _collect_javascript_file_calls(source: bytes, root: Node) -> list[ParsedCall]:
+    calls: list[ParsedCall] = []
+
+    def walk_defs(node: Node) -> None:
+        if node.type in {
+            "function_declaration",
+            "generator_function_declaration",
+            "method_definition",
+            "arrow_function",
+        }:
+            name_node = (
+                named_child_by_type(node, "identifier")
+                or named_child_by_type(node, "property_identifier")
+            )
+            if name_node is None and node.type != "arrow_function":
+                return
+            fn_name = node_text(source, name_node) if name_node else "<anonymous>"
+            class_name = _enclosing_js_class_name(node, source)
+            caller = f"{class_name}.{fn_name}" if class_name else fn_name
+            body = child_by_type(node, "statement_block") or child_by_type(node, "body")
+            if body is None and node.type == "arrow_function":
+                body = node
+            calls.extend(extract_javascript_calls(source, caller=caller, body_node=body))
+        for child in node.children:
+            walk_defs(child)
+
+    walk_defs(root)
+    return calls
+
+
+def _enclosing_js_class_name(node: Node, source: bytes) -> str | None:
+    parent = node.parent
+    while parent is not None:
+        if parent.type in {"class_declaration", "class"}:
+            name_node = named_child_by_type(parent, "identifier") or named_child_by_type(
+                parent, "type_identifier",
+            )
+            return node_text(source, name_node) if name_node else None
+        parent = parent.parent
+    return None

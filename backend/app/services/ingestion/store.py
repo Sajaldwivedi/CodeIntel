@@ -17,6 +17,7 @@ class IngestionStage(str, Enum):
     VALIDATING = "validating"
     CLONING = "cloning"
     PARSING = "parsing"
+    GRAPHING = "graphing"
     INDEXING = "indexing"
     EMBEDDING = "embedding"
     COMPLETED = "completed"
@@ -28,6 +29,7 @@ STAGE_PROGRESS: dict[IngestionStage, int] = {
     IngestionStage.VALIDATING: 5,
     IngestionStage.CLONING: 20,
     IngestionStage.PARSING: 50,
+    IngestionStage.GRAPHING: 65,
     IngestionStage.INDEXING: 75,
     IngestionStage.EMBEDDING: 90,
     IngestionStage.COMPLETED: 100,

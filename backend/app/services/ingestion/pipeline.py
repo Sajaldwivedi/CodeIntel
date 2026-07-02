@@ -182,9 +182,24 @@ class IngestionPipeline:
         )
 
         job.update(
-            progress=65,
+            progress=60,
             message=f"Parsed {parse_summary.files_parsed} files into {parse_summary.chunk_count} semantic chunks…",
         )
+
+        repo_slug = f"{job.owner}/{job.name}"
+        graph_summary = None
+        if self._settings.neo4j_enabled:
+            job.update(
+                stage=IngestionStage.GRAPHING,
+                message="Building code knowledge graph in Neo4j…",
+            )
+            graph_summary = await asyncio.to_thread(
+                _run_graph_index,
+                repo_slug,
+                parsed_files,
+                sources,
+                self._settings,
+            )
 
         job.update(
             stage=IngestionStage.INDEXING,
@@ -198,7 +213,6 @@ class IngestionPipeline:
             message="Generating embeddings and storing in ChromaDB…",
         )
 
-        repo_slug = f"{job.owner}/{job.name}"
         embed_summary = await asyncio.to_thread(
             _run_embedding_index,
             repo_slug,
@@ -223,6 +237,9 @@ class IngestionPipeline:
             "symbol_count": parse_summary.symbol_count,
             "api_endpoint_count": parse_summary.api_endpoint_count,
             "files_parsed": parse_summary.files_parsed,
+            "graph_nodes": graph_summary.nodes_written if graph_summary else 0,
+            "graph_relationships": graph_summary.relationships_written if graph_summary else 0,
+            "graph_enabled": self._settings.neo4j_enabled,
             "embeddings_indexed": total_embedded,
             "embeddings_new": embed_summary.chunks_indexed,
             "embeddings_skipped": embed_summary.chunks_skipped,
@@ -250,7 +267,8 @@ class IngestionPipeline:
             progress=100,
             message=(
                 f"Successfully ingested {scan.file_count} files "
-                f"({total_embedded} embeddings in ChromaDB)."
+                f"({total_embedded} embeddings, "
+                f"{graph_summary.nodes_written if graph_summary else 0} graph nodes)."
             ),
             metadata=result_metadata,
         )
@@ -358,3 +376,25 @@ def _run_embedding_index(
                 "to EMBEDDING_PROVIDER=jina.",
             ) from exc
         raise
+
+
+def _run_graph_index(
+    repo_id: str,
+    parsed_files: list,
+    sources: dict[str, str],
+    settings: Settings,
+):
+    from services.graph import GraphIndexer, GraphServiceError
+
+    try:
+        indexer = GraphIndexer(
+            uri=settings.neo4j_uri,
+            user=settings.neo4j_user,
+            password=settings.neo4j_password,
+        )
+        return indexer.index_repository(repo_id, parsed_files, sources)
+    except GraphServiceError as exc:
+        raise ValidationError(
+            f"Neo4j graph indexing failed: {exc}. "
+            "Ensure Neo4j is running (docker compose up neo4j) or set NEO4J_ENABLED=false.",
+        ) from exc

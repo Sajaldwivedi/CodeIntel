@@ -7,30 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/input";
+import { chatWithAgent } from "@/api/agent";
 import { useRepoStore } from "@/store/repoStore";
 import { cn } from "@/utils/cn";
-import type { ChatMessage, Citation } from "@/types";
+import type { ChatMessage } from "@/types";
 
 const SUGGESTIONS = [
   "How does authentication work?",
   "Where is the database connection configured?",
   "Explain the request lifecycle",
   "What are the main API endpoints?",
-];
-
-const CANNED_CITATIONS: Citation[] = [
-  {
-    path: "backend/app/middleware/error_handler.py",
-    startLine: 60,
-    endLine: 78,
-    snippet: "def register_error_handlers(app: FastAPI) -> None:\n    @app.exception_handler(AppError)\n    async def _handle_app_error(request, exc):",
-  },
-  {
-    path: "backend/app/main.py",
-    startLine: 24,
-    endLine: 40,
-    snippet: "def create_app(settings=None) -> FastAPI:\n    app = FastAPI(title=settings.app_name)\n    register_middleware(app, settings)",
-  },
 ];
 
 export function ChatPage() {
@@ -41,15 +27,26 @@ export function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSessionId(undefined);
+    setMessages([]);
+  }, [activeRepo?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const content = text.trim();
     if (!content || thinking) return;
+    if (!activeRepo) {
+      setError("Select or ingest a repository before asking questions.");
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -60,19 +57,52 @@ export function ChatPage() {
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setThinking(true);
+    setError(null);
 
-    setTimeout(() => {
+    try {
+      const repoId = `${activeRepo.owner}/${activeRepo.name}`;
+      const response = await chatWithAgent({
+        repo_id: repoId,
+        question: content,
+        session_id: sessionId,
+      });
+      setSessionId(response.session_id);
       const assistant: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content:
-          "Based on the indexed code, this behaviour is implemented via the application factory and a middleware layer. The relevant handlers are registered during startup, and errors are translated into a consistent JSON envelope. See the cited sources below for the exact implementation.",
-        citations: CANNED_CITATIONS,
+        content: response.answer,
+        citations: response.citations.map((c) => ({
+          path: c.file_path,
+          startLine: c.start_line,
+          endLine: c.end_line,
+          snippet: c.snippet,
+          functionName: c.function_name,
+          source: c.source,
+          score: c.score,
+        })),
+        confidence: response.confidence,
+        reasoningSummary: response.reasoning_steps.at(-1),
+        reasoningSteps: response.reasoning_steps,
+        plan: response.plan,
+        toolsUsed: response.tools_used,
         createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((m) => [...m, assistant]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Query failed.";
+      setError(message);
+      setMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: message,
+          createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    } finally {
       setThinking(false);
-    }, 1600);
+    }
   };
 
   const hasMessages = messages.length > 0;
@@ -88,13 +118,14 @@ export function ChatPage() {
           <div>
             <h1 className="text-lg font-semibold">Code Chat</h1>
             <p className="text-xs text-muted-foreground">
-              Chatting with <span className="text-foreground">{activeRepo?.owner}/{activeRepo?.name}</span>
+              AI Software Engineer ·{" "}
+              <span className="text-foreground">{activeRepo?.owner}/{activeRepo?.name}</span>
             </p>
           </div>
         </div>
         <Badge variant="secondary" className="gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Hybrid retrieval
+          LangGraph agent
         </Badge>
       </div>
 
@@ -137,6 +168,9 @@ export function ChatPage() {
 
       {/* Composer */}
       <div className="border-t border-white/10 pt-4">
+        {error && (
+          <p className="mb-2 text-center text-xs text-red-400">{error}</p>
+        )}
         <div className="relative">
           <Textarea
             value={input}
@@ -199,6 +233,36 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           {message.content}
         </div>
 
+        {!isUser && message.confidence !== undefined && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="secondary">Confidence {(message.confidence * 100).toFixed(0)}%</Badge>
+            {message.toolsUsed?.map((tool) => (
+              <Badge key={tool} variant="secondary">{tool}</Badge>
+            ))}
+          </div>
+        )}
+
+        {message.reasoningSteps && message.reasoningSteps.length > 0 && !isUser && (
+          <details className="w-full text-xs text-muted-foreground">
+            <summary className="cursor-pointer font-medium">Reasoning ({message.reasoningSteps.length} steps)</summary>
+            <ol className="mt-2 list-decimal space-y-1 pl-4">
+              {message.reasoningSteps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          </details>
+        )}
+
+        {message.plan && message.plan.length > 0 && !isUser && (
+          <p className="text-xs text-muted-foreground">
+            Plan: {message.plan.join(" → ")}
+          </p>
+        )}
+
+        {message.reasoningSummary && !isUser && !message.reasoningSteps?.length && (
+          <p className="text-xs text-muted-foreground">{message.reasoningSummary}</p>
+        )}
+
         {message.citations && message.citations.length > 0 && (
           <div className="w-full space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Sources</p>
@@ -207,6 +271,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
                   <FileCode className="h-3.5 w-3.5 text-primary" />
                   <span className="truncate font-mono text-xs">{c.path}</span>
+                  {c.functionName && (
+                    <Badge variant="secondary" className="text-[10px]">{c.functionName}</Badge>
+                  )}
                   <Badge variant="secondary" className="ml-auto text-[10px]">
                     L{c.startLine}-{c.endLine}
                   </Badge>

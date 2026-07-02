@@ -42,6 +42,9 @@ export interface Citation {
   startLine: number;
   endLine: number;
   snippet: string;
+  functionName?: string | null;
+  source?: string;
+  score?: number;
 }
 
 export interface ChatMessage {
@@ -49,6 +52,12 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  confidence?: number;
+  reasoningSummary?: string;
+  reasoningSteps?: string[];
+  plan?: string[];
+  toolsUsed?: string[];
+  strategy?: string;
   createdAt: string;
 }
 

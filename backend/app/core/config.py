@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"
+    neo4j_enabled: bool = True
 
     # --- ChromaDB (vector database) ---
     chroma_host: str = "localhost"
@@ -75,11 +76,16 @@ class Settings(BaseSettings):
     # Outside ``backend/`` so uvicorn --reload does not restart mid-clone.
     ingestion_workspace_dir: str = "../data/ingestion"
 
-    # --- LLM provider abstraction (answer generation; no logic wired yet) ---
-    llm_provider: str = "openai"
+    # --- LLM provider abstraction (answer generation) ---
+    llm_provider: str = "gemini"
     openai_api_key: str | None = None
-    # Retained for the answering LLM only — not used for embeddings.
+    openai_model: str = "gpt-4o-mini"
     gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
+
+    # --- Hybrid retrieval ---
+    retrieval_top_k: int = 8
+    rerank_top_k: int = 5
 
     @property
     def is_production(self) -> bool:

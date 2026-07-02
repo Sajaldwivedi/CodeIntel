@@ -1,20 +1,45 @@
-"""Knowledge graph integration backed by Neo4j.
-
-Scaffolding only: driver lifecycle and Cypher execution are added in a later
-phase. The interface defines the contract used to build and traverse the code
-knowledge graph.
-"""
+"""Neo4j driver wrapper with indexed batch writes and query helpers."""
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
+# Schema DDL executed once per process to enable indexed lookups.
+_SCHEMA_STATEMENTS: tuple[str, ...] = (
+    "CREATE CONSTRAINT graph_repository_id IF NOT EXISTS "
+    "FOR (n:Repository) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_file_id IF NOT EXISTS "
+    "FOR (n:File) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_class_id IF NOT EXISTS "
+    "FOR (n:Class) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_function_id IF NOT EXISTS "
+    "FOR (n:Function) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_method_id IF NOT EXISTS "
+    "FOR (n:Method) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_endpoint_id IF NOT EXISTS "
+    "FOR (n:ApiEndpoint) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_table_id IF NOT EXISTS "
+    "FOR (n:DatabaseTable) REQUIRE n.id IS UNIQUE",
+    "CREATE CONSTRAINT graph_library_id IF NOT EXISTS "
+    "FOR (n:ExternalLibrary) REQUIRE n.id IS UNIQUE",
+    "CREATE INDEX graph_repo_id IF NOT EXISTS FOR (n) ON (n.repo_id)",
+    "CREATE INDEX graph_node_name IF NOT EXISTS FOR (n) ON (n.name)",
+    "CREATE INDEX graph_file_path IF NOT EXISTS FOR (n:File) ON (n.path)",
+    "CREATE INDEX graph_symbol_file IF NOT EXISTS FOR (n) ON (n.file_path)",
+    "CREATE INDEX graph_qualified_name IF NOT EXISTS FOR (n:Method) ON (n.qualified_name)",
+)
+
+_schema_ready = False
+
 
 @dataclass(slots=True)
 class GraphNode:
-    """A node in the code knowledge graph (e.g. File, Symbol, Module)."""
+    """A node in the code knowledge graph."""
 
     id: str
     label: str
@@ -23,7 +48,7 @@ class GraphNode:
 
 @dataclass(slots=True)
 class GraphRelationship:
-    """A directed relationship between two graph nodes (e.g. IMPORTS, CALLS)."""
+    """A directed relationship between two graph nodes."""
 
     start_id: str
     end_id: str
@@ -31,15 +56,12 @@ class GraphRelationship:
     properties: dict[str, Any] = field(default_factory=dict)
 
 
+class GraphServiceError(RuntimeError):
+    """Raised when Neo4j operations fail."""
+
+
 class GraphService:
-    """Manage a connection to Neo4j and expose graph operations.
-
-    Supports use as a context manager so callers can guarantee the driver is
-    closed:
-
-        with GraphService(uri, user, password) as graph:
-            graph.upsert_node(...)
-    """
+    """Manage a connection to Neo4j and expose graph operations."""
 
     def __init__(self, uri: str, user: str, password: str) -> None:
         self._uri = uri
@@ -49,34 +71,124 @@ class GraphService:
 
     @property
     def is_connected(self) -> bool:
-        """Whether a live driver has been established."""
         return self._driver is not None
 
     def connect(self) -> None:
-        """Open a Neo4j driver connection.
+        """Open a Neo4j driver connection and ensure schema indexes exist."""
+        if self._driver is not None:
+            return
+        try:
+            from neo4j import GraphDatabase
+        except ImportError as exc:
+            raise GraphServiceError(
+                "neo4j package is not installed. Add it to backend/requirements.txt.",
+            ) from exc
 
-        Raises:
-            NotImplementedError: Always, until the graph phase is built.
-        """
-        raise NotImplementedError("Neo4j connection is implemented in a later phase.")
+        try:
+            self._driver = GraphDatabase.driver(
+                self._uri,
+                auth=(self._user, self._password),
+            )
+            self._driver.verify_connectivity()
+            self.ensure_schema()
+            logger.info("Connected to Neo4j at %s", self._uri)
+        except Exception as exc:
+            self._driver = None
+            raise GraphServiceError(f"Failed to connect to Neo4j at {self._uri}: {exc}") from exc
+
+    def ensure_schema(self) -> None:
+        """Create uniqueness constraints and lookup indexes (idempotent)."""
+        global _schema_ready
+        if _schema_ready or self._driver is None:
+            return
+        with self._driver.session() as session:
+            for statement in _SCHEMA_STATEMENTS:
+                session.run(statement)
+        _schema_ready = True
+        logger.info("Neo4j graph schema constraints and indexes are ready")
 
     def close(self) -> None:
-        """Close the driver connection if open."""
         if self._driver is not None:
             self._driver.close()
             self._driver = None
 
     def upsert_node(self, node: GraphNode) -> None:
-        """Create or update a node."""
-        raise NotImplementedError("Graph writes are implemented in a later phase.")
+        self.upsert_nodes([node])
+
+    def upsert_nodes(self, nodes: list[GraphNode]) -> None:
+        if not nodes or self._driver is None:
+            return
+        grouped: dict[str, list[GraphNode]] = {}
+        for node in nodes:
+            grouped.setdefault(node.label, []).append(node)
+
+        with self._driver.session() as session:
+            for label, batch in grouped.items():
+                session.run(
+                    f"""
+                    UNWIND $rows AS row
+                    MERGE (n:{label} {{id: row.id}})
+                    SET n += row.props
+                    """,
+                    rows=[
+                        {"id": node.id, "props": {"id": node.id, **node.properties}}
+                        for node in batch
+                    ],
+                )
 
     def upsert_relationship(self, relationship: GraphRelationship) -> None:
-        """Create or update a relationship."""
-        raise NotImplementedError("Graph writes are implemented in a later phase.")
+        self.upsert_relationships([relationship])
+
+    def upsert_relationships(self, relationships: list[GraphRelationship]) -> None:
+        if not relationships or self._driver is None:
+            return
+        grouped: dict[str, list[GraphRelationship]] = {}
+        for rel in relationships:
+            grouped.setdefault(rel.type, []).append(rel)
+
+        with self._driver.session() as session:
+            for rel_type, batch in grouped.items():
+                session.run(
+                    f"""
+                    UNWIND $rows AS row
+                    MATCH (a {{id: row.start_id}})
+                    MATCH (b {{id: row.end_id}})
+                    MERGE (a)-[r:{rel_type}]->(b)
+                    SET r += row.props
+                    """,
+                    rows=[
+                        {
+                            "start_id": rel.start_id,
+                            "end_id": rel.end_id,
+                            "props": rel.properties,
+                        }
+                        for rel in batch
+                    ],
+                )
+
+    def delete_repository(self, repo_id: str) -> int:
+        """Remove all nodes belonging to ``repo_id``."""
+        if self._driver is None:
+            return 0
+        with self._driver.session() as session:
+            result = session.run(
+                """
+                MATCH (n {repo_id: $repo_id})
+                WITH collect(n) AS nodes, count(n) AS total
+                FOREACH (node IN nodes | DETACH DELETE node)
+                RETURN total
+                """,
+                repo_id=repo_id,
+            )
+            record = result.single()
+            return int(record["total"]) if record else 0
 
     def run(self, cypher: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-        """Execute a Cypher query and return rows as dictionaries."""
-        raise NotImplementedError("Cypher execution is implemented in a later phase.")
+        if self._driver is None:
+            raise GraphServiceError("Neo4j driver is not connected.")
+        with self._driver.session() as session:
+            result = session.run(cypher, parameters or {})
+            return [dict(record) for record in result]
 
     def __enter__(self) -> GraphService:
         self.connect()
