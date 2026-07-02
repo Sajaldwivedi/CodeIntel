@@ -74,6 +74,47 @@ class ChromaEmbeddingStore:
         result = self._collection.get(where={"repo_id": repo_id}, include=[])
         return set(result.get("ids") or [])
 
+    def get_repo_embedding_dimension(self, repo_id: str) -> int | None:
+        """Return the dimensionality of stored vectors for ``repo_id``, if any."""
+        result = self._collection.get(
+            where={"repo_id": repo_id},
+            include=["embeddings"],
+            limit=1,
+        )
+        embeddings = result.get("embeddings")
+        if embeddings is None or len(embeddings) == 0:
+            return None
+        return len(embeddings[0])
+
+    def get_collection_embedding_dimension(self) -> int | None:
+        """Return the dimensionality of any vector in the collection, if present."""
+        result = self._collection.get(include=["embeddings"], limit=1)
+        embeddings = result.get("embeddings")
+        if embeddings is None or len(embeddings) == 0:
+            return None
+        return len(embeddings[0])
+
+    def reset_collection_if_dimension_mismatch(self, expected_dim: int) -> bool:
+        """Drop and recreate the collection when embedding dimensionality changes.
+
+        Chroma fixes vector dimension on first insert; switching embedding
+        providers (e.g. Gemini 3072 → Jina 1024) requires a full reset.
+        """
+        current = self.get_collection_embedding_dimension()
+        if current is None or current == expected_dim:
+            return False
+        logger.warning(
+            "Chroma collection dimension mismatch stored=%d expected=%d — resetting collection",
+            current,
+            expected_dim,
+        )
+        self._client.delete_collection(self._collection_name)
+        self._collection = self._client.get_or_create_collection(
+            name=self._collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        return True
+
     def upsert_chunks(self, chunks: list[SemanticChunk], embeddings: list[list[float]]) -> int:
         if not chunks:
             return 0

@@ -56,23 +56,30 @@ class Settings(BaseSettings):
     chroma_persistent_path: str = "../data/chroma"
 
     # --- Embeddings ---
-    embedding_provider: str = "openai"
-    embedding_batch_size: int = 32
+    # Active embedding backend: "jina" (default) or "openai".
+    embedding_provider: str = "jina"
+    embedding_batch_size: int = 64
     class_line_threshold: int = 80
-    # Pause between Gemini batch API calls (RPM limit, not daily quota).
-    gemini_request_delay_seconds: float = 4.0
-    gemini_max_retries: int = 8
-    embedding_rate_limit_retries: int = 6
+
+    # --- Jina embeddings (primary provider) ---
+    jina_api_key: str | None = None
+    jina_embedding_model: str = "jina-embeddings-v3"
+    jina_batch_size: int = 64
+    jina_api_url: str = "https://api.jina.ai/v1/embeddings"
+    jina_timeout_seconds: float = 60.0
+    jina_max_retries: int = 3
+    # Optional Matryoshka output size; None uses the model default (1024).
+    jina_dimensions: int | None = None
 
     # --- Repository ingestion ---
     # Outside ``backend/`` so uvicorn --reload does not restart mid-clone.
     ingestion_workspace_dir: str = "../data/ingestion"
 
-    # --- LLM provider abstraction (no logic wired yet) ---
+    # --- LLM provider abstraction (answer generation; no logic wired yet) ---
     llm_provider: str = "openai"
     openai_api_key: str | None = None
+    # Retained for the answering LLM only — not used for embeddings.
     gemini_api_key: str | None = None
-    gemini_model: str = "models/gemini-embedding-001"
 
     @property
     def is_production(self) -> bool:

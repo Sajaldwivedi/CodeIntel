@@ -219,7 +219,7 @@ class IngestionPipeline:
             "total_size_bytes": scan.total_size_bytes,
             "languages": languages,
             "primary_language": scan.primary_language,
-            "chunk_count": parse_summary.chunk_count,
+            "chunk_count": embed_summary.chunks_total or parse_summary.chunk_count,
             "symbol_count": parse_summary.symbol_count,
             "api_endpoint_count": parse_summary.api_endpoint_count,
             "files_parsed": parse_summary.files_parsed,
@@ -238,9 +238,10 @@ class IngestionPipeline:
             "forks": github_metadata.forks if github_metadata else 0,
         }
 
-        if total_embedded < parse_summary.chunk_count:
+        expected_chunks = embed_summary.chunks_total or parse_summary.chunk_count
+        if total_embedded < expected_chunks:
             raise ValidationError(
-                f"Embedding incomplete ({total_embedded}/{parse_summary.chunk_count} chunks indexed). "
+                f"Embedding incomplete ({total_embedded}/{expected_chunks} chunks indexed). "
                 "Retry ingestion to continue.",
             )
 
@@ -303,31 +304,37 @@ def _run_embedding_index(
     from services.embeddings import EmbeddingIndexer
     from services.embeddings.providers import EmbeddingProviderError
 
-    if settings.embedding_provider == "openai" and not settings.openai_api_key:
+    provider = settings.embedding_provider.lower().strip()
+    if provider == "jina" and not settings.jina_api_key:
+        raise ValidationError(
+            "JINA_API_KEY is required for embeddings. Set it in .env or switch EMBEDDING_PROVIDER.",
+        )
+    if provider == "openai" and not settings.openai_api_key:
         raise ValidationError(
             "OPENAI_API_KEY is required for embeddings. Set it in .env or switch EMBEDDING_PROVIDER.",
         )
-    if settings.embedding_provider == "gemini" and not settings.gemini_api_key:
-        raise ValidationError(
-            "GEMINI_API_KEY is required for embeddings. Set it in .env or switch EMBEDDING_PROVIDER.",
-        )
+
+    # Jina batches internally at jina_batch_size; OpenAI uses the generic size.
+    batch_size = settings.jina_batch_size if provider == "jina" else settings.embedding_batch_size
 
     try:
         indexer = EmbeddingIndexer(
             provider_name=settings.embedding_provider,
             openai_api_key=settings.openai_api_key,
-            gemini_api_key=settings.gemini_api_key,
-            gemini_model=settings.gemini_model,
-            gemini_request_delay_seconds=settings.gemini_request_delay_seconds,
+            jina_api_key=settings.jina_api_key,
+            jina_model=settings.jina_embedding_model,
+            jina_batch_size=settings.jina_batch_size,
+            jina_api_url=settings.jina_api_url,
+            jina_timeout_seconds=settings.jina_timeout_seconds,
+            jina_max_retries=settings.jina_max_retries,
+            jina_dimensions=settings.jina_dimensions,
             chroma_host=settings.chroma_host if settings.chroma_use_http else None,
             chroma_port=settings.chroma_port if settings.chroma_use_http else None,
             chroma_persistent_path=settings.chroma_persistent_path_resolved,
             collection_name=settings.chroma_collection,
             manifest_dir=settings.embedding_manifest_dir,
-            batch_size=settings.embedding_batch_size,
+            batch_size=batch_size,
             class_line_threshold=settings.class_line_threshold,
-            rate_limit_retries=settings.embedding_rate_limit_retries,
-            gemini_max_retries=settings.gemini_max_retries,
         )
     except EmbeddingProviderError as exc:
         raise ValidationError(str(exc)) from exc
@@ -336,28 +343,18 @@ def _run_embedding_index(
         return indexer.index_repository(repo_id, parsed_files, sources)
     except Exception as exc:
         message = str(exc).lower()
-        if (
-            "insufficient_quota" in message
-            or "exceeded your current quota" in message
-            or "429" in message
-            or "resourceexhausted" in message
-        ):
-            provider = settings.embedding_provider
-            if provider == "gemini":
+        if "401" in message or "unauthorized" in message or "invalid_api_key" in message:
+            if provider == "jina":
+                raise ValidationError("Invalid Jina API key. Check JINA_API_KEY in .env.") from exc
+            raise ValidationError("Invalid OpenAI API key. Check OPENAI_API_KEY in .env.") from exc
+        if "insufficient_quota" in message or "429" in message or "rate limit" in message:
+            if provider == "jina":
                 raise ValidationError(
-                    "Gemini rate limit hit (requests per minute), not your daily quota. "
-                    "Wait 1–2 minutes and retry ingestion — already-indexed chunks are saved.",
+                    "Jina API rate limit or quota exceeded. Wait a moment and retry ingestion — "
+                    "already-indexed chunks are saved.",
                 ) from exc
             raise ValidationError(
                 "OpenAI API quota exceeded. Add billing at platform.openai.com or switch "
-                "to EMBEDDING_PROVIDER=gemini.",
-            ) from exc
-        if "invalid_api_key" in message or "incorrect api key" in message:
-            raise ValidationError("Invalid OpenAI API key. Check OPENAI_API_KEY in .env.") from exc
-        if "api key not valid" in message or "api_key_invalid" in message:
-            raise ValidationError("Invalid Gemini API key. Check GEMINI_API_KEY in .env.") from exc
-        if "not found for api version" in message and "embed" in message:
-            raise ValidationError(
-                "Gemini embedding model unavailable. Set GEMINI_MODEL=models/gemini-embedding-001 in .env.",
+                "to EMBEDDING_PROVIDER=jina.",
             ) from exc
         raise

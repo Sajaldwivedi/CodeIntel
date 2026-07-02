@@ -148,6 +148,7 @@ class TestEmbeddingIndexer:
 
         mock_provider = MagicMock()
         mock_provider.name = "openai"
+        mock_provider.dimension = 3
         mock_provider.embed_texts.side_effect = lambda texts: [[0.1, 0.2, 0.3] for _ in texts]
 
         with patch("services.embeddings.indexer.create_embedding_provider", return_value=mock_provider):
@@ -169,7 +170,7 @@ class TestEmbeddingIndexer:
             assert summary2.files_unchanged == 1
             assert mock_provider.embed_texts.call_count == calls_after_first
 
-    def test_resumes_partial_embedding_when_files_unchanged(self, tmp_path: Path) -> None:
+    def test_failed_batch_does_not_abort_and_resumes_next_run(self, tmp_path: Path) -> None:
         from services.embeddings.indexer import EmbeddingIndexer
 
         parsed = _parsed_file()
@@ -181,30 +182,32 @@ class TestEmbeddingIndexer:
 
         def embed_side_effect(texts: list[str]) -> list[list[float]]:
             call_count["n"] += 1
-            if call_count["n"] <= 6:
-                raise RuntimeError("429 quota exceeded")
+            # First run's batch fails permanently; later runs succeed.
+            if call_count["n"] == 1:
+                raise RuntimeError("jina batch failed after 3 attempts")
             return [[0.1, 0.2, 0.3] for _ in texts]
 
         mock_provider = MagicMock()
-        mock_provider.name = "openai"
+        mock_provider.name = "jina"
         mock_provider.embed_texts.side_effect = embed_side_effect
 
         with patch("services.embeddings.indexer.create_embedding_provider", return_value=mock_provider):
-            with patch("services.embeddings.indexer.time.sleep"):
-                indexer = EmbeddingIndexer(
-                    provider_name="openai",
-                    openai_api_key="test-key",
-                    chroma_persistent_path=chroma_path,
-                    manifest_dir=manifest_dir,
-                    batch_size=64,
-                    rate_limit_retries=6,
-                )
-                with pytest.raises(RuntimeError):
-                    indexer.index_repository("acme/app", [parsed], sources)
+            indexer = EmbeddingIndexer(
+                provider_name="jina",
+                jina_api_key="test-key",
+                chroma_persistent_path=chroma_path,
+                manifest_dir=manifest_dir,
+                batch_size=64,
+            )
+            # Failing batch must NOT raise — indexing continues and reports failures.
+            summary1 = indexer.index_repository("acme/app", [parsed], sources)
+            assert summary1.chunks_indexed == 0
+            assert summary1.chunks_failed > 0
 
-                summary = indexer.index_repository("acme/app", [parsed], sources)
-                assert summary.chunks_indexed > 0
-                assert summary.chunks_embedded == summary.chunks_total
+            # A subsequent run re-embeds the chunks that failed before.
+            summary2 = indexer.index_repository("acme/app", [parsed], sources)
+            assert summary2.chunks_indexed > 0
+            assert summary2.chunks_embedded == summary2.chunks_total
 
     def test_changed_file_triggers_reindex(self, tmp_path: Path) -> None:
         from services.embeddings.indexer import EmbeddingIndexer
@@ -217,6 +220,7 @@ class TestEmbeddingIndexer:
 
         mock_provider = MagicMock()
         mock_provider.name = "openai"
+        mock_provider.dimension = 3
         mock_provider.embed_texts.side_effect = lambda texts: [[0.1, 0.2, 0.3] for _ in texts]
 
         with patch("services.embeddings.indexer.create_embedding_provider", return_value=mock_provider):
@@ -232,25 +236,121 @@ class TestEmbeddingIndexer:
             assert summary.files_changed == 1
             assert mock_provider.embed_texts.call_count > first_calls
 
+    def test_dimension_mismatch_purges_stale_vectors(self, tmp_path: Path) -> None:
+        from services.embeddings.indexer import EmbeddingIndexer
 
-class TestGeminiProvider:
-    def test_parses_single_embedding(self) -> None:
-        from services.embeddings.providers.gemini_provider import GeminiEmbeddingProvider
+        parsed = _parsed_file()
+        sources = {"app/service.py": SAMPLE_SOURCE}
+        manifest_dir = tmp_path / "manifests"
+        chroma_path = tmp_path / "chroma"
 
-        vectors = GeminiEmbeddingProvider._parse_embedding_response(
-            {"embedding": [0.1, 0.2, 0.3]},
-            expected=1,
-        )
-        assert vectors == [[0.1, 0.2, 0.3]]
+        mock_provider = MagicMock()
+        mock_provider.name = "jina"
+        mock_provider.dimension = 1024
+        mock_provider.embed_texts.side_effect = lambda texts: [[0.1] * 1024 for _ in texts]
 
-    def test_parses_batch_embeddings(self) -> None:
-        from services.embeddings.providers.gemini_provider import GeminiEmbeddingProvider
+        with patch("services.embeddings.indexer.create_embedding_provider", return_value=mock_provider):
+            indexer = EmbeddingIndexer(
+                provider_name="jina",
+                jina_api_key="test-key",
+                chroma_persistent_path=chroma_path,
+                manifest_dir=manifest_dir,
+            )
+            summary1 = indexer.index_repository("acme/app", [parsed], sources)
+            assert summary1.chunks_indexed > 0
 
-        vectors = GeminiEmbeddingProvider._parse_embedding_response(
-            {"embedding": [[0.1, 0.2], [0.3, 0.4]]},
-            expected=2,
-        )
-        assert vectors == [[0.1, 0.2], [0.3, 0.4]]
+            mock_provider.dimension = 3072
+            mock_provider.embed_texts.side_effect = lambda texts: [[0.2] * 3072 for _ in texts]
+            summary2 = indexer.index_repository("acme/app", [parsed], sources)
+            assert summary2.chunks_indexed > 0
+            assert summary2.chunks_skipped == 0
+            assert mock_provider.embed_texts.call_count >= 2
+
+
+class TestJinaEmbeddingService:
+    @staticmethod
+    def _fake_response(vectors: list[list[float]]) -> MagicMock:
+        response = MagicMock()
+        response.status_code = 200
+        response.raise_for_status = MagicMock()
+        response.json.return_value = {
+            "data": [{"index": i, "embedding": vec} for i, vec in enumerate(vectors)],
+        }
+        return response
+
+    def test_requires_api_key(self) -> None:
+        from services.embeddings.embedding_service import JinaEmbeddingError, JinaEmbeddingService
+
+        with pytest.raises(JinaEmbeddingError):
+            JinaEmbeddingService("")
+
+    def test_embed_texts_batches_and_orders(self) -> None:
+        from services.embeddings.embedding_service import JinaEmbeddingService
+
+        session = MagicMock()
+        captured_payloads: list[dict] = []
+
+        def post(url: str, json: dict) -> MagicMock:
+            captured_payloads.append(json)
+            n = len(json["input"])
+            # Return out-of-order to verify the service re-sorts by index.
+            vecs = [[float(i)] * 3 for i in range(n)]
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.raise_for_status = MagicMock()
+            resp.json.return_value = {
+                "data": list(reversed([{"index": i, "embedding": v} for i, v in enumerate(vecs)])),
+            }
+            return resp
+
+        session.post.side_effect = post
+        service = JinaEmbeddingService("key", batch_size=2, session=session)
+
+        vectors = service.embed_texts(["a", "b", "c"])
+        assert len(vectors) == 3
+        assert vectors[0] == [0.0, 0.0, 0.0]
+        assert session.post.call_count == 2  # batch sizes 2 + 1
+        assert all(payload.get("truncate") is True for payload in captured_payloads)
+
+    def test_embed_text_single(self) -> None:
+        from services.embeddings.embedding_service import JinaEmbeddingService
+
+        session = MagicMock()
+        session.post.return_value = self._fake_response([[0.1, 0.2, 0.3]])
+        service = JinaEmbeddingService("key", session=session)
+
+        assert service.embed_text("hello") == [0.1, 0.2, 0.3]
+
+    def test_retries_then_succeeds(self) -> None:
+        from services.embeddings.embedding_service import JinaEmbeddingService
+
+        session = MagicMock()
+        calls = {"n": 0}
+
+        def post(url: str, json: dict) -> MagicMock:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("transient 500")
+            resp = self._fake_response([[0.5, 0.5, 0.5]])
+            return resp
+
+        session.post.side_effect = post
+        with patch("services.embeddings.embedding_service.time.sleep"):
+            service = JinaEmbeddingService("key", max_retries=3, session=session)
+            vectors = service.embed_texts(["a"])
+
+        assert vectors == [[0.5, 0.5, 0.5]]
+        assert calls["n"] == 2
+
+    def test_raises_after_max_retries(self) -> None:
+        from services.embeddings.embedding_service import JinaEmbeddingError, JinaEmbeddingService
+
+        session = MagicMock()
+        session.post.side_effect = RuntimeError("boom")
+        with patch("services.embeddings.embedding_service.time.sleep"):
+            service = JinaEmbeddingService("key", max_retries=2, session=session)
+            with pytest.raises(JinaEmbeddingError):
+                service.embed_texts(["a"])
 
 
 class TestChromaMetadata:

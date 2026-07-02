@@ -44,6 +44,7 @@ class IndexSummary:
     provider: str
     collection: str
     chunks_total: int = 0
+    chunks_failed: int = 0
 
     @property
     def chunks_embedded(self) -> int:

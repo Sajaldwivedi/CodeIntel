@@ -1,10 +1,18 @@
-"""Repository embedding indexer."""
+"""Repository embedding indexer.
+
+Orchestrates the embedding stage: builds semantic chunks, embeds them in
+batches via the configured :class:`EmbeddingProvider` (Jina by default), and
+upserts vectors into ChromaDB with incremental (per-file hash) re-indexing.
+
+The provider owns batching + retry/backoff for a single API call; this indexer
+owns repo-level orchestration: iterating batches, persisting progress, and
+continuing past a permanently-failing batch instead of aborting the whole run.
+"""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-import time
 
 from services.embeddings.chroma_store import ChromaEmbeddingStore
 from services.embeddings.manifest import (
@@ -29,26 +37,33 @@ class EmbeddingIndexer:
         *,
         provider_name: str,
         openai_api_key: str | None = None,
-        gemini_api_key: str | None = None,
-        gemini_model: str = "models/gemini-embedding-001",
-        gemini_request_delay_seconds: float = 2.0,
+        openai_model: str = "text-embedding-3-small",
+        jina_api_key: str | None = None,
+        jina_model: str = "jina-embeddings-v3",
+        jina_batch_size: int = 64,
+        jina_api_url: str = "https://api.jina.ai/v1/embeddings",
+        jina_timeout_seconds: float = 60.0,
+        jina_max_retries: int = 3,
+        jina_dimensions: int | None = None,
         chroma_host: str | None = None,
         chroma_port: int | None = None,
         chroma_persistent_path: Path | None = None,
         collection_name: str = "repo_embeddings",
         manifest_dir: Path | None = None,
-        batch_size: int = 32,
+        batch_size: int = 64,
         class_line_threshold: int = 80,
-        rate_limit_retries: int = 6,
-        gemini_max_retries: int = 8,
     ) -> None:
         self._provider = create_embedding_provider(
             provider_name,
             openai_api_key=openai_api_key,
-            gemini_api_key=gemini_api_key,
-            gemini_model=gemini_model,
-            gemini_request_delay_seconds=gemini_request_delay_seconds,
-            gemini_max_retries=gemini_max_retries,
+            openai_model=openai_model,
+            jina_api_key=jina_api_key,
+            jina_model=jina_model,
+            jina_batch_size=jina_batch_size,
+            jina_api_url=jina_api_url,
+            jina_timeout_seconds=jina_timeout_seconds,
+            jina_max_retries=jina_max_retries,
+            jina_dimensions=jina_dimensions,
         )
         self._store = ChromaEmbeddingStore(
             host=chroma_host,
@@ -57,9 +72,8 @@ class EmbeddingIndexer:
             collection_name=collection_name,
         )
         self._manifest_dir = manifest_dir or Path("data/embeddings/manifests")
-        self._batch_size = batch_size
+        self._batch_size = max(1, batch_size)
         self._class_line_threshold = class_line_threshold
-        self._rate_limit_retries = rate_limit_retries
 
     def index_repository(
         self,
@@ -68,9 +82,22 @@ class EmbeddingIndexer:
         sources: dict[str, str],
     ) -> IndexSummary:
         """Embed and store chunks, re-indexing only changed files."""
-        current_hashes = {pf.file: file_content_hash(sources[pf.file]) for pf in parsed_files if pf.file in sources}
-        previous = load_manifest(self._manifest_dir, repo_id)
-        prev_files = previous.files if previous else {}
+        current_hashes = {
+            pf.file: file_content_hash(sources[pf.file])
+            for pf in parsed_files
+            if pf.file in sources
+        }
+        expected_dim = getattr(self._provider, "dimension", None)
+        if isinstance(expected_dim, int):
+            if self._store.reset_collection_if_dimension_mismatch(expected_dim):
+                previous = None
+                prev_files: dict[str, str] = {}
+            else:
+                previous = load_manifest(self._manifest_dir, repo_id)
+                prev_files = previous.files if previous else {}
+        else:
+            previous = load_manifest(self._manifest_dir, repo_id)
+            prev_files = previous.files if previous else {}
 
         unchanged, changed, removed = diff_files(prev_files, current_hashes)
 
@@ -88,7 +115,15 @@ class EmbeddingIndexer:
         existing_ids = self._store.get_existing_ids(repo_id)
         new_chunks = [c for c in all_chunks if c.content_hash not in existing_ids]
 
-        indexed = self._embed_and_upsert(new_chunks, repo_id, current_hashes)
+        logger.info(
+            "Embedding repository %s: %d new chunks (%d already indexed) via provider=%s",
+            repo_id,
+            len(new_chunks),
+            len(all_chunks) - len(new_chunks),
+            self._provider.name,
+        )
+
+        indexed, failed = self._embed_and_upsert(new_chunks, repo_id, current_hashes)
         skipped = len(all_chunks) - len(new_chunks)
         final_ids = self._store.get_existing_ids(repo_id)
 
@@ -100,6 +135,14 @@ class EmbeddingIndexer:
         save_manifest(self._manifest_dir, manifest)
 
         pending_files = {chunk.file_path for chunk in new_chunks}
+
+        logger.info(
+            "Repository indexing complete: repo=%s indexed=%d skipped=%d failed=%d",
+            repo_id,
+            indexed,
+            skipped,
+            failed,
+        )
 
         return IndexSummary(
             repo_id=repo_id,
@@ -113,6 +156,7 @@ class EmbeddingIndexer:
             provider=self._provider.name,
             collection=self._store.collection.name,
             chunks_total=len(all_chunks),
+            chunks_failed=failed,
         )
 
     def _embed_and_upsert(
@@ -120,53 +164,47 @@ class EmbeddingIndexer:
         chunks: list[SemanticChunk],
         repo_id: str,
         file_hashes: dict[str, str],
-    ) -> int:
+    ) -> tuple[int, int]:
+        """Embed ``chunks`` in batches and upsert them into ChromaDB.
+
+        Returns ``(indexed, failed)``. A batch that permanently fails (after the
+        provider's internal retries) is logged and skipped so the remaining
+        batches still get indexed — indexing is never aborted mid-repository.
+        """
         if not chunks:
-            return 0
-        total = 0
+            return 0, 0
+
+        indexed = 0
+        failed = 0
         indexed_ids: list[str] = list(self._store.get_existing_ids(repo_id))
-        batch_attempts = self._rate_limit_retries
-        for i in range(0, len(chunks), self._batch_size):
-            batch = chunks[i : i + self._batch_size]
+        total_batches = (len(chunks) + self._batch_size - 1) // self._batch_size
+
+        for batch_index, start in enumerate(range(0, len(chunks), self._batch_size), start=1):
+            batch = chunks[start : start + self._batch_size]
             texts = [chunk.document for chunk in batch]
-            vectors: list[list[float]] | None = None
-            for attempt in range(batch_attempts):
-                try:
-                    vectors = self._provider.embed_texts(texts)
-                    break
-                except Exception as exc:
-                    if attempt < batch_attempts - 1 and self._is_rate_limit(exc):
-                        wait = 25.0 * (attempt + 1)
-                        logger.warning(
-                            "embedding_rate_limit batch_start=%d attempt=%d wait=%.0fs",
-                            i,
-                            attempt + 1,
-                            wait,
-                        )
-                        time.sleep(wait)
-                        continue
-                    logger.exception("embedding_batch_failed batch_start=%d batch_size=%d", i, len(batch))
-                    save_manifest(
-                        self._manifest_dir,
-                        RepoManifest(repo_id=repo_id, files=file_hashes, chunk_ids=sorted(set(indexed_ids))),
-                    )
-                    raise
-            if vectors is None:
-                raise RuntimeError("embedding batch failed without vectors")
-            total += self._store.upsert_chunks(batch, vectors)
+            try:
+                vectors = self._provider.embed_texts(texts)
+            except Exception:
+                failed += len(batch)
+                logger.exception(
+                    "embedding_batch_failed batch=%d/%d size=%d — skipping and continuing",
+                    batch_index,
+                    total_batches,
+                    len(batch),
+                )
+                # Persist progress so a later re-run resumes from here.
+                save_manifest(
+                    self._manifest_dir,
+                    RepoManifest(repo_id=repo_id, files=file_hashes, chunk_ids=sorted(set(indexed_ids))),
+                )
+                continue
+
+            indexed += self._store.upsert_chunks(batch, vectors)
             indexed_ids.extend(chunk.content_hash for chunk in batch)
             save_manifest(
                 self._manifest_dir,
                 RepoManifest(repo_id=repo_id, files=file_hashes, chunk_ids=sorted(set(indexed_ids))),
             )
-        return total
+            logger.info("Batch %d/%d complete (%d chunks)", batch_index, total_batches, len(batch))
 
-    @staticmethod
-    def _is_rate_limit(exc: Exception) -> bool:
-        message = str(exc).lower()
-        return (
-            "429" in message
-            or "resourceexhausted" in message
-            or "rate_limit" in message
-            or "quota" in message
-        )
+        return indexed, failed
