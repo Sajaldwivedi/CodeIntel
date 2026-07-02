@@ -19,7 +19,7 @@ from app.services.ingestion.github import (
     fetch_repo_metadata,
     parse_github_url,
 )
-from app.services.ingestion.parse_store import save_parse_results
+from app.services.ingestion.parse_store import load_parse_results, parse_output_dir, save_parse_results
 from app.services.ingestion.store import IngestionJob, IngestionStage, get_ingestion_store
 
 logger = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ class IngestionPipeline:
             work_dir,
             file_entries,
             job.id,
-            self._settings.ingestion_workspace_path.parent / "parsed",
+            parse_output_dir(self._settings.ingestion_workspace_path),
         )
 
         job.update(

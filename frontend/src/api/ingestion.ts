@@ -1,5 +1,6 @@
 import { apiClient } from "@/api/client";
 import type { GitHubIngestionRequest, IngestionJob, IngestionStartResponse } from "@/types/ingestion";
+import type { ParseResultsResponse } from "@/types/parse";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -25,6 +26,11 @@ export async function startZipIngestion(file: File, name: string, owner = "local
 
 export async function getIngestionStatus(jobId: string): Promise<IngestionJob> {
   const { data } = await apiClient.get<IngestionJob>(`/ingestion/${jobId}`);
+  return data;
+}
+
+export async function getParseResults(jobId: string): Promise<ParseResultsResponse> {
+  const { data } = await apiClient.get<ParseResultsResponse>(`/ingestion/${jobId}/parse`);
   return data;
 }
 

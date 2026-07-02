@@ -18,6 +18,7 @@ from app.schemas.ingestion import (
     IngestionJobResponse,
     IngestionStartResponse,
 )
+from app.services.ingestion.parse_store import load_parse_results, parse_output_dir
 from app.services.ingestion.pipeline import IngestionPipeline
 from app.services.ingestion.store import get_ingestion_store
 
@@ -87,6 +88,30 @@ async def get_ingestion_status(job_id: str) -> IngestionJobResponse:
     if job is None:
         raise NotFoundError(f"Ingestion job '{job_id}' not found.")
     return IngestionJobResponse(**job.to_dict())
+
+
+@router.get(
+    "/{job_id}/parse",
+    summary="Get Tree-sitter parse results for a completed ingestion job",
+)
+async def get_parse_results(
+    job_id: str,
+    settings: Settings = Depends(get_app_settings),
+) -> dict:
+    """Return structured parse output (functions, classes, imports, chunks metadata)."""
+    store = get_ingestion_store()
+    job = await store.get_job(job_id)
+    if job is None:
+        raise NotFoundError(f"Ingestion job '{job_id}' not found.")
+
+    output_dir = parse_output_dir(settings.ingestion_workspace_path)
+    data = load_parse_results(output_dir, job_id)
+    if data is None:
+        raise NotFoundError(
+            f"Parse results for job '{job_id}' are not available. "
+            "The job may still be running or was ingested before parsing was enabled.",
+        )
+    return data
 
 
 @router.get(

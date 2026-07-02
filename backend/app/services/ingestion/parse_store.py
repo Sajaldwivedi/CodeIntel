@@ -27,3 +27,16 @@ def save_parse_results(
     out_path = output_dir / f"{job_id}.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return out_path
+
+
+def load_parse_results(output_dir: Path, job_id: str) -> dict[str, Any] | None:
+    """Load persisted parse results for an ingestion job."""
+    out_path = output_dir / f"{job_id}.json"
+    if not out_path.is_file():
+        return None
+    return json.loads(out_path.read_text(encoding="utf-8"))
+
+
+def parse_output_dir(workspace_path: Path) -> Path:
+    """Return the directory where parse JSON artifacts are stored."""
+    return workspace_path.parent / "parsed"

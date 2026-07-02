@@ -95,6 +95,11 @@ class TestIngestionApi:
         response = client.get("/api/v1/ingestion/job-nonexistent")
         assert response.status_code == 404
 
+    def test_get_parse_results_not_found(self) -> None:
+        client = _client()
+        response = client.get("/api/v1/ingestion/job-nonexistent/parse")
+        assert response.status_code == 404
+
 
 class TestZipExtraction:
     def test_extract_flatten_single_root(self, tmp_path: Path) -> None:
