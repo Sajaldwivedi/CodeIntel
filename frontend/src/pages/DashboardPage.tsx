@@ -1,0 +1,174 @@
+import { motion } from "framer-motion";
+import {
+  Activity,
+  Boxes,
+  Database,
+  FileCode2,
+  FolderGit2,
+  MessageSquareText,
+  Plus,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+import { EmptyState } from "@/components/common/EmptyState";
+import { PageHeader } from "@/components/common/PageHeader";
+import { RepoCard } from "@/components/common/RepoCard";
+import { StatCard } from "@/components/common/StatCard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { mockActivity } from "@/data/mock";
+import { useSimulatedLoading } from "@/hooks/useSimulatedLoading";
+import { useRepoStore } from "@/store/repoStore";
+import { formatCompact } from "@/utils/format";
+import { staggerContainer } from "@/utils/motion";
+import type { ActivityItem } from "@/types";
+
+const ACTIVITY_STYLES: Record<ActivityItem["type"], string> = {
+  index: "bg-emerald-500/15 text-emerald-400",
+  query: "bg-violet-500/15 text-violet-400",
+  upload: "bg-cyan-500/15 text-cyan-400",
+  error: "bg-red-500/15 text-red-400",
+};
+
+export function DashboardPage() {
+  const navigate = useNavigate();
+  const repositories = useRepoStore((s) => s.repositories);
+  const { isLoading } = useSimulatedLoading({ delay: 800 });
+
+  const totalChunks = repositories.reduce((acc, r) => acc + r.chunks, 0);
+  const totalFiles = repositories.reduce((acc, r) => acc + r.files, 0);
+  const indexed = repositories.filter((r) => r.status === "indexed").length;
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Dashboard"
+        description="Overview of your indexed repositories and recent activity."
+        actions={
+          <Button variant="gradient" onClick={() => navigate("/upload")}>
+            <Plus />
+            Add repository
+          </Button>
+        }
+      />
+
+      {/* Stats */}
+      <motion.div
+        variants={staggerContainer(0.06)}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+      >
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[116px] rounded-xl" />)
+        ) : (
+          <>
+            <StatCard label="Repositories" value={`${repositories.length}`} icon={<FolderGit2 />} delta="+2" />
+            <StatCard label="Files indexed" value={formatCompact(totalFiles)} icon={<FileCode2 />} delta="+18%" accent="text-cyan-400" />
+            <StatCard label="Vector chunks" value={formatCompact(totalChunks)} icon={<Database />} delta="+9%" accent="text-fuchsia-400" />
+            <StatCard label="Indexed" value={`${indexed}/${repositories.length}`} icon={<Boxes />} accent="text-emerald-400" />
+          </>
+        )}
+      </motion.div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Repositories */}
+        <div className="lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Repositories</h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/upload")}>
+              View all
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-[168px] rounded-xl" />
+              ))}
+            </div>
+          ) : repositories.length === 0 ? (
+            <EmptyState
+              icon={<FolderGit2 />}
+              title="No repositories yet"
+              description="Connect your first GitHub repository to start asking questions about your code."
+              action={
+                <Button variant="gradient" onClick={() => navigate("/upload")}>
+                  <Plus />
+                  Add repository
+                </Button>
+              }
+            />
+          ) : (
+            <motion.div
+              variants={staggerContainer(0.06)}
+              initial="hidden"
+              animate="show"
+              className="grid gap-4 sm:grid-cols-2"
+            >
+              {repositories.map((repo) => (
+                <RepoCard key={repo.id} repo={repo} />
+              ))}
+            </motion.div>
+          )}
+        </div>
+
+        {/* Activity feed */}
+        <div>
+          <div className="mb-4 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Recent activity</h2>
+          </div>
+          <Card>
+            <CardContent className="p-2">
+              {isLoading ? (
+                <div className="space-y-3 p-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3 w-2/3" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="divide-y divide-white/5">
+                  {mockActivity.map((item) => (
+                    <li key={item.id} className="flex items-start gap-3 p-3 transition-colors hover:bg-white/[0.03]">
+                      <span className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg ${ACTIVITY_STYLES[item.type]}`}>
+                        <MessageSquareText className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{item.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+                      </div>
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">{item.time}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Ask across all repos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Jump straight into a conversation with your entire codebase.
+              </p>
+              <Button variant="secondary" className="mt-4 w-full" onClick={() => navigate("/chat")}>
+                <MessageSquareText />
+                Open chat
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

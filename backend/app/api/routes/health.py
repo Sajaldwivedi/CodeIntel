@@ -7,9 +7,10 @@ delegated to a dedicated service rather than implemented inline here.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from app.core.config import get_settings
+from app.api.deps import get_app_settings
+from app.core.config import Settings
 from app.schemas.health import HealthResponse
 
 router = APIRouter()
@@ -21,9 +22,8 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     summary="Liveness/health check",
 )
-async def health_check() -> HealthResponse:
+async def health_check(settings: Settings = Depends(get_app_settings)) -> HealthResponse:
     """Return basic service metadata to signal the API is alive."""
-    settings = get_settings()
     return HealthResponse(
         status="ok",
         service=settings.app_name,

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
+from app.core.lifespan import register_lifespan
 from app.core.logging import configure_logging, get_logger
 from app.middleware import register_middleware
 
@@ -38,8 +39,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.enable_docs else None,
     )
 
+    # Expose settings on app state so request-scoped dependencies resolve the
+    # exact settings this app was built with (important for tests/multi-app).
+    app.state.settings = settings
+
     # Order matters: middleware first, then routers.
     register_middleware(app, settings)
+    register_lifespan(app, settings)
     app.include_router(api_router, prefix=settings.api_prefix)
 
     logger.info(

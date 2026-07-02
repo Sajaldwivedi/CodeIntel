@@ -1,14 +1,40 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { HomePage } from "@/pages/HomePage";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ArchitecturePage } from "@/pages/ArchitecturePage";
+import { ChatPage } from "@/pages/ChatPage";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { DependencyGraphPage } from "@/pages/DependencyGraphPage";
+import { LandingPage } from "@/pages/LandingPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
+import { RepositoryOverviewPage } from "@/pages/RepositoryOverviewPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { UploadRepositoryPage } from "@/pages/UploadRepositoryPage";
 
 /** Root application component and route table. */
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-      </Routes>
-    </BrowserRouter>
+    <TooltipProvider delayDuration={200}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+
+          {/* Authenticated app shell */}
+          <Route element={<AppLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/upload" element={<UploadRepositoryPage />} />
+            <Route path="/repository" element={<RepositoryOverviewPage />} />
+            <Route path="/repository/:id" element={<RepositoryOverviewPage />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/architecture" element={<ArchitecturePage />} />
+            <Route path="/dependencies" element={<DependencyGraphPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   );
 }

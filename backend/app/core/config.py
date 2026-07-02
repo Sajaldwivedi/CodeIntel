@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     chroma_host: str = "localhost"
     chroma_port: int = 8000
 
+    # --- Repository ingestion ---
+    ingestion_workspace_dir: str = "data/ingestion"
+
     # --- LLM provider abstraction (no logic wired yet) ---
     llm_provider: str = "openai"
     openai_api_key: str | None = None
