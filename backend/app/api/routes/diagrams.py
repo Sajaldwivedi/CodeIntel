@@ -5,8 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
-from app.api.deps import get_graph_query_engine
+from app.api.deps import get_app_settings, get_graph_query_engine
+from app.core.config import Settings
 from app.middleware.error_handler import NotFoundError, ValidationError
+from app.services.cache_service import cache_key, get_cache_service
 from app.schemas.diagrams import (
     DiagramBundleResponse,
     DiagramExportResponse,
@@ -54,9 +56,16 @@ def _bundle_to_response(bundle) -> DiagramBundleResponse:
 async def generate_diagrams(
     repo_id: str,
     engine: GraphQueryEngine = Depends(get_graph_query_engine),
+    settings: Settings = Depends(get_app_settings),
 ) -> DiagramBundleResponse:
     """Build Mermaid diagrams, system architecture, and dependency graph views."""
     decoded = _decode_repo_id(repo_id)
+    cache = get_cache_service()
+    key = cache_key("diagrams", decoded)
+    cached = cache.get_json(key)
+    if cached:
+        return DiagramBundleResponse(**cached)
+
     try:
         stats = engine.repository_stats(decoded)
     except GraphServiceError as exc:
@@ -65,7 +74,9 @@ async def generate_diagrams(
         raise NotFoundError(f"No graph data found for repository '{decoded}'.")
 
     bundle = DiagramGenerator(engine).generate(decoded)
-    return _bundle_to_response(bundle)
+    response = _bundle_to_response(bundle)
+    cache.set_json(key, response.model_dump(), ttl_seconds=settings.cache_ttl_diagrams)
+    return response
 
 
 @router.get(

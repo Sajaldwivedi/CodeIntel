@@ -15,4 +15,18 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          motion: ["framer-motion"],
+          charts: ["recharts"],
+          flow: ["@xyflow/react"],
+          mermaid: ["mermaid"],
+          markdown: ["react-markdown", "react-syntax-highlighter", "remark-gfm"],
+        },
+      },
+    },
+  },
 });

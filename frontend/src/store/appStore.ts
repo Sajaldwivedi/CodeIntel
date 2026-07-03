@@ -6,11 +6,13 @@ interface AppState {
   theme: Theme;
   sidebarCollapsed: boolean;
   commandOpen: boolean;
+  mobileNavOpen: boolean;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setCommandOpen: (open: boolean) => void;
+  setMobileNavOpen: (open: boolean) => void;
 }
 
 const STORAGE_KEY = "ai-swe-theme";
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: initialTheme(),
   sidebarCollapsed: false,
   commandOpen: false,
+  mobileNavOpen: false,
   setTheme: (theme) => {
     applyTheme(theme);
     window.localStorage.setItem(STORAGE_KEY, theme);
@@ -41,4 +44,5 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setCommandOpen: (open) => set({ commandOpen: open }),
+  setMobileNavOpen: (open) => set({ mobileNavOpen: open }),
 }));

@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     # --- Redis (background worker queue) ---
     redis_url: str = "redis://localhost:6379/0"
 
+    # --- Response cache ---
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 300
+    cache_ttl_analytics: int = 600
+    cache_ttl_diagrams: int = 900
+
     # --- LLM provider abstraction (answer generation) ---
     llm_provider: str = "groq"
     openai_api_key: str | None = None

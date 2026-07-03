@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import get_app_settings
 from app.core.config import Settings
 from app.middleware.error_handler import NotFoundError
+from app.services.cache_service import cache_key, get_cache_service
 from app.schemas.analytics import (
     ComplexitySliceResponse,
     DependencyEdgeResponse,
@@ -47,6 +48,12 @@ async def get_repository_analytics(
 ) -> RepositoryAnalyticsResponse:
     """Compute metrics, heatmaps, and dependency graphs from parse artifacts."""
     decoded = _decode_repo_id(repo_id)
+    cache = get_cache_service()
+    key = cache_key("analytics", decoded)
+    cached = cache.get_json(key)
+    if cached:
+        return RepositoryAnalyticsResponse(**cached)
+
     parse_data = resolve_parse_data(settings.ingestion_workspace_path, decoded)
     if parse_data is None and decoded != repo_id:
         parse_data = resolve_parse_data(settings.ingestion_workspace_path, repo_id)
@@ -58,7 +65,7 @@ async def get_repository_analytics(
     analytics = AnalyticsComputer().compute(parse_data)
     graph = analytics.dependency_graph
 
-    return RepositoryAnalyticsResponse(
+    response = RepositoryAnalyticsResponse(
         repo_id=analytics.repo_id,
         job_id=analytics.job_id,
         file_count=analytics.file_count,
@@ -89,3 +96,5 @@ async def get_repository_analytics(
         ),
         summary=analytics.summary,
     )
+    cache.set_json(key, response.model_dump(), ttl_seconds=settings.cache_ttl_analytics)
+    return response

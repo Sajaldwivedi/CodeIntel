@@ -2,23 +2,32 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Outlet, useLocation } from "react-router-dom";
 
 import { AuroraBackground } from "@/components/common/AuroraBackground";
+import { SkipLink } from "@/components/common/SkipLink";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { pageTransition } from "@/utils/motion";
 
 /** Shell for all authenticated app pages: sidebar + topbar + animated outlet. */
 export function AppLayout() {
   const location = useLocation();
+  useKeyboardShortcuts();
 
   return (
     <div className="relative flex min-h-screen bg-background">
+      <SkipLink />
       <AuroraBackground />
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          aria-label="Main content"
+          className="flex-1 px-4 py-6 outline-none md:px-8 md:py-8"
+        >
           <div className="mx-auto w-full max-w-7xl">
             <AnimatePresence mode="wait">
               <motion.div

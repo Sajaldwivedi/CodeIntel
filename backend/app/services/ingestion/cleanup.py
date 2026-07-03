@@ -79,6 +79,15 @@ def delete_ingestion_job(settings: Settings, job_id: str) -> dict[str, Any]:
         deleted["embedding_manifest"] = _safe_unlink(manifest_path)
 
         try:
+            from app.services.cache_service import cache_key, get_cache_service
+
+            cache = get_cache_service()
+            cache.delete_prefix(cache_key("analytics", repo_id))
+            cache.delete_prefix(cache_key("diagrams", repo_id))
+        except Exception as exc:
+            logger.warning("Cache cleanup failed for %s: %s", repo_id, exc)
+
+        try:
             from services.embeddings.chroma_store import ChromaEmbeddingStore
 
             chroma = ChromaEmbeddingStore(
