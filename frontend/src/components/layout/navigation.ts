@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   GitBranch,
   LayoutDashboard,
   Layers,
@@ -23,6 +24,7 @@ export const navItems: NavItem[] = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, shortcut: "G D" },
   { label: "Upload Repository", to: "/upload", icon: UploadCloud, shortcut: "G U" },
   { label: "Repository", to: "/repository", icon: GitBranch, shortcut: "G R" },
+  { label: "Analytics", to: "/analytics", icon: BarChart3, shortcut: "G N" },
   { label: "Chat", to: "/chat", icon: MessagesSquare, shortcut: "G C" },
   { label: "Diagrams", to: "/diagrams", icon: Workflow, shortcut: "G A" },
   { label: "Architecture", to: "/architecture", icon: Layers, shortcut: "G H" },

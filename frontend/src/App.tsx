@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { ArchitecturePage } from "@/pages/ArchitecturePage";
 import { ChatPage } from "@/pages/ChatPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/repository" element={<RepositoryOverviewPage />} />
             <Route path="/repository/:id" element={<RepositoryOverviewPage />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/architecture" element={<ArchitecturePage />} />
             <Route path="/dependencies" element={<DependencyGraphPage />} />
             <Route path="/diagrams" element={<DiagramsPage />} />

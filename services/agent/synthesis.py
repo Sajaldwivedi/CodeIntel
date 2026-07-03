@@ -151,7 +151,8 @@ Question: {question}
 Evidence collected from repository tools (use ONLY this):
 {chr(10).join(evidence[:20])}
 
-Write a clear, helpful answer in plain language. Reference specific files and functions from the evidence.
+Write a clear, helpful answer in **Markdown**. Use fenced code blocks with language tags for snippets.
+Reference specific files with backticks (e.g. `backend/app/main.py`) and functions with backticks.
 For "how does this project work" questions, summarize the architecture, main entry points, and data flow.
 
 Return JSON only:

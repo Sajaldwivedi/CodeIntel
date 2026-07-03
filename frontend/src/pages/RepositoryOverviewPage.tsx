@@ -10,7 +10,7 @@ import {
   Star,
   Workflow,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { getIngestionStatus } from "@/api/ingestion";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -32,6 +32,7 @@ import { staggerContainer } from "@/utils/motion";
 export function RepositoryOverviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const selectedId = useRepoStore((s) => s.selectedRepoId);
   const updateFromIngestion = useRepoStore((s) => s.updateFromIngestion);
   const repo = useRepoStore(
@@ -39,6 +40,14 @@ export function RepositoryOverviewPage() {
   );
   const [selectedFile, setSelectedFile] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
+
+  const fileFromQuery = searchParams.get("file");
+
+  useEffect(() => {
+    if (fileFromQuery) {
+      setSelectedFile(fileFromQuery);
+    }
+  }, [fileFromQuery]);
 
   const canLoadParse = repo?.status === "indexed" || repo?.status === "failed";
   const { data: parseData, error, loading, refetch } = useParseResults(repo?.id ?? null, canLoadParse);

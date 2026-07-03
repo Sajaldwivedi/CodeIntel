@@ -23,6 +23,10 @@ class AgentChatResponse(BaseModel):
     answer: str
     confidence: float
     reasoning_steps: list[str]
+    reasoning_summary: str = ""
     plan: list[str]
     tools_used: list[str]
+    file_references: list[str] = Field(default_factory=list)
+    function_references: list[str] = Field(default_factory=list)
+    follow_up_suggestions: list[str] = Field(default_factory=list)
     citations: list[CodeCitationResponse]

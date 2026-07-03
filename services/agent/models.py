@@ -37,3 +37,7 @@ class AgentResponse:
     plan: list[str]
     tools_used: list[str]
     citations: list[CodeCitation]
+    reasoning_summary: str = ""
+    file_references: list[str] = field(default_factory=list)
+    function_references: list[str] = field(default_factory=list)
+    follow_up_suggestions: list[str] = field(default_factory=list)

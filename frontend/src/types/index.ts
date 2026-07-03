@@ -57,6 +57,11 @@ export interface ChatMessage {
   reasoningSteps?: string[];
   plan?: string[];
   toolsUsed?: string[];
+  fileReferences?: string[];
+  functionReferences?: string[];
+  followUpSuggestions?: string[];
+  isStreaming?: boolean;
+  statusLabel?: string;
   strategy?: string;
   createdAt: string;
 }
