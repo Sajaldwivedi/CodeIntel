@@ -125,15 +125,35 @@ export async function exportElementSvg(element: HTMLElement, filename: string) {
   anchor.click();
 }
 
+export function cleanupMermaidArtifacts() {
+  const markers = ["Syntax error in text", "mermaid version"];
+  document.querySelectorAll("body > div, body > svg, [id^='dmermaid-']").forEach((el) => {
+    const text = el.textContent ?? "";
+    if (markers.some((m) => text.includes(m))) {
+      el.remove();
+    }
+  });
+}
+
 export async function renderMermaidSvg(source: string, id: string): Promise<string> {
   const mermaid = (await import("mermaid")).default;
   mermaid.initialize({
     startOnLoad: false,
     theme: "dark",
     securityLevel: "loose",
+    suppressErrorRendering: true,
   });
-  const { svg } = await mermaid.render(id, source);
-  return svg;
+
+  const sanitized = source.trim() || "flowchart TB\n  empty[No diagram data]";
+
+  try {
+    const { svg } = await mermaid.render(id, sanitized);
+    cleanupMermaidArtifacts();
+    return svg;
+  } catch (err) {
+    cleanupMermaidArtifacts();
+    throw err;
+  }
 }
 
 export function downloadSvgMarkup(svg: string, filename: string) {

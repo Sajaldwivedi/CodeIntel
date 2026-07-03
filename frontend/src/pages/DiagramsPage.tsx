@@ -7,7 +7,7 @@ import { toApiErrorMessage } from "@/api/client";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ExportToolbar } from "@/components/diagrams/ExportToolbar";
-import { graphViewToFlow } from "@/components/diagrams/diagramUtils";
+import { graphViewToFlow, cleanupMermaidArtifacts } from "@/components/diagrams/diagramUtils";
 import { InteractiveGraph } from "@/components/diagrams/InteractiveGraph";
 import { MermaidPanel } from "@/components/diagrams/MermaidPanel";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,10 @@ export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
       setTab(routeTab);
     }
   }, [view, routeTab]);
+
+  useEffect(() => {
+    cleanupMermaidArtifacts();
+  }, [activeView]);
 
   const load = useCallback(async () => {
     if (!activeRepo) {

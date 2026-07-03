@@ -72,6 +72,11 @@ class TestDiagramGenerator:
         assert len(bundle.dependency_graph["nodes"]) == 2
         assert len(bundle.dependency_graph["edges"]) == 1
 
+    def test_mermaid_avoids_invalid_class_stereotype_syntax(self) -> None:
+        bundle = DiagramGenerator(_engine()).generate("owner/repo")
+        assert "<<" not in bundle.mermaid.class_diagram
+        assert '["' in bundle.mermaid.flowchart or "[" in bundle.mermaid.flowchart
+
     def test_markdown_export(self) -> None:
         bundle = DiagramGenerator(_engine()).generate("owner/repo")
         assert "# Architecture Diagrams" in bundle.markdown

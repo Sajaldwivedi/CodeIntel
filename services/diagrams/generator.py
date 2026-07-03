@@ -21,7 +21,30 @@ _SYSTEM_TIER: dict[str, tuple[str, str, float]] = {
 
 def _slug(value: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", value.strip())
-    return cleaned[:48] or "node"
+    if not cleaned:
+        cleaned = "node"
+    if cleaned[0].isdigit():
+        cleaned = f"n_{cleaned}"
+    return cleaned[:48]
+
+
+def _mermaid_quote(text: str) -> str:
+    """Return a Mermaid-safe quoted string."""
+    safe = str(text or "").replace('"', "'").replace("\n", " ").strip()
+    return f'"{safe[:120]}"'
+
+
+def _mermaid_label(text: str) -> str:
+    """Return a bracket node label, quoted when needed."""
+    safe = str(text or "").replace('"', "'").replace("\n", " ").strip()[:80]
+    if re.search(r'[/\[\]():|]', safe):
+        return f'["{safe}"]'
+    return f"[{safe or 'node'}]"
+
+
+def _mermaid_method(name: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", str(name or ""))
+    return cleaned[:40] or "method"
 
 
 def _basename(path: str) -> str:
@@ -292,10 +315,11 @@ class DiagramGenerator:
 
         for layer in layers:
             sid = _slug(layer.layer)
-            lines.append(f'  subgraph {sid} ["{layer.layer.title()} ({layer.file_count} files)"]')
+            title = f"{layer.layer.title()} layer, {layer.file_count} files"
+            lines.append(f"  subgraph {sid} [{title}]")
             for j, sample in enumerate(layer.sample_files[:4]):
                 fid = _slug(f"{layer.layer}_{j}")
-                lines.append(f'    {fid}["{_basename(sample)}"]')
+                lines.append(f"    {fid}{_mermaid_label(_basename(sample))}")
             lines.append("  end")
 
         tier_order = ["presentation", "business", "data", "infrastructure"]
@@ -306,14 +330,20 @@ class DiagramGenerator:
                 lines.append(f"  {_slug(a)} --> {_slug(b)}")
 
         for i, row in enumerate(cross_layer[:8]):
-            src = _slug(str(row.get("source") or f"src{i}"))
-            dst = _slug(str(row.get("target") or f"dst{i}"))
-            lines.append(f'  {src}["{row.get("source")}"] -->|calls| {dst}["{row.get("target")}"]')
+            src_id = f"cross_src_{i}"
+            dst_id = f"cross_dst_{i}"
+            src_name = str(row.get("source") or f"src{i}")
+            dst_name = str(row.get("target") or f"dst{i}")
+            lines.append(f"  {src_id}{_mermaid_label(src_name)}")
+            lines.append(f"  {dst_id}{_mermaid_label(dst_name)}")
+            lines.append(f"  {src_id} -->|calls| {dst_id}")
 
-        for ep in endpoints[:4]:
+        for i, ep in enumerate(endpoints[:4]):
             route = ep.get("route") or "/"
             handler = ep.get("handler") or "handler"
-            lines.append(f'  client["Client"] -->|{ep.get("method", "GET")} {route}| {_slug(handler)}["{handler}"]')
+            hid = _slug(f"handler_{handler}_{i}")
+            label = f"{ep.get('method', 'GET')} {route}"
+            lines.append(f"  client{_mermaid_label('Client')} -->|{_mermaid_quote(label)}| {hid}{_mermaid_label(handler)}")
 
         return "\n".join(lines)
 
@@ -327,25 +357,35 @@ class DiagramGenerator:
         handler = ep.get("handler") or "Handler"
         route = ep.get("route") or "/"
         method = ep.get("method") or "GET"
+        handler_id = _slug(handler)
         lines.append("  participant Client")
         lines.append("  participant API")
-        lines.append(f"  participant { _slug(handler) } as {handler}")
+        lines.append(f"  participant {handler_id} as {_mermaid_quote(handler)}")
         lines.append("  participant Service")
         lines.append("  participant DB")
-        lines.append(f"  Client->>+API: {method} {route}")
-        lines.append(f"  API->>+{_slug(handler)}: invoke")
-        lines.append(f"  {_slug(handler)}->>+Service: business logic")
+        lines.append(f"  Client->>+API: {_mermaid_quote(f'{method} {route}')}")
+        lines.append(f"  API->>+{handler_id}: {_mermaid_quote('invoke')}")
+        lines.append(f"  {handler_id}->>+Service: {_mermaid_quote('business logic')}")
 
         chains = self._engine.trace_call_chain(repo_id, symbol=handler, max_depth=4)
+        seen_participants: set[str] = {handler_id, "Client", "API", "Service", "DB"}
         for chain in chains[:2]:
             names = [n.get("name") for n in chain.path if n.get("name")]
             for j in range(len(names) - 1):
-                lines.append(f"  {_slug(names[j])}->>{_slug(names[j + 1])}: call")
+                a = _slug(str(names[j]))
+                b = _slug(str(names[j + 1]))
+                if a not in seen_participants:
+                    lines.insert(4, f"  participant {a} as {_mermaid_quote(str(names[j]))}")
+                    seen_participants.add(a)
+                if b not in seen_participants:
+                    lines.insert(4, f"  participant {b} as {_mermaid_quote(str(names[j + 1]))}")
+                    seen_participants.add(b)
+                lines.append(f"  {a}->>{b}: {_mermaid_quote('call')}")
 
-        lines.append("  Service->>+DB: query")
+        lines.append(f"  Service->>+DB: {_mermaid_quote('query')}")
         lines.append("  DB-->>-Service: rows")
-        lines.append(f"  Service-->>-{_slug(handler)}: result")
-        lines.append(f"  {_slug(handler)}-->>-API: response")
+        lines.append(f"  Service-->>-{handler_id}: result")
+        lines.append(f"  {handler_id}-->>-API: response")
         lines.append("  API-->>-Client: JSON")
         return "\n".join(lines)
 
@@ -361,13 +401,10 @@ class DiagramGenerator:
 
         for cls in classes[:20]:
             name = _slug(cls.get("name") or "Class")
-            display = cls.get("name") or "Class"
             lines.append(f"  class {name} {{")
             for method in (cls.get("methods") or [])[:6]:
-                lines.append(f"    +{method}()")
+                lines.append(f"    +{_mermaid_method(method)}()")
             lines.append("  }")
-            if cls.get("file_path"):
-                lines.append(f"  <<{_basename(cls['file_path'])}>> {name}")
 
         for rel in relations[:25]:
             src = _slug(rel.get("source") or "A")

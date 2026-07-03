@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 
-import { renderMermaidSvg } from "@/components/diagrams/diagramUtils";
+import { cleanupMermaidArtifacts, renderMermaidSvg } from "@/components/diagrams/diagramUtils";
 import { cn } from "@/utils/cn";
 
 interface MermaidPanelProps {
@@ -30,6 +30,7 @@ export function MermaidPanel({ title, source, exportRef }: MermaidPanelProps) {
       });
     return () => {
       cancelled = true;
+      cleanupMermaidArtifacts();
     };
   }, [source, title, uid]);
 
