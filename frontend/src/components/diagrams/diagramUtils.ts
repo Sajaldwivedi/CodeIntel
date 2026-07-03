@@ -1,8 +1,12 @@
 import type { GraphView, VisEdge, VisNode } from "@/api/diagrams";
 import type { Edge, Node } from "@xyflow/react";
-
-const CANVAS_W = 960;
-const CANVAS_H = 560;
+import {
+  CANVAS_H,
+  CANVAS_W,
+  filterEdgesForNodes,
+  layoutDependencyGraph,
+  layoutSystemGraph,
+} from "@/components/diagrams/layoutGraph";
 
 const KIND_COLORS: Record<string, string> = {
   frontend: "#22d3ee",
@@ -65,9 +69,24 @@ export function visToFlowEdges(edges: VisEdge[]): Edge[] {
 }
 
 export function graphViewToFlow(view: GraphView, mode: "system" | "dependency") {
+  let nodes = view.nodes;
+  let edges = view.edges;
+  let truncated = false;
+
+  if (mode === "system") {
+    nodes = layoutSystemGraph(nodes);
+  } else {
+    const laid = layoutDependencyGraph(nodes, edges);
+    nodes = laid.nodes;
+    truncated = laid.truncated;
+    const ids = new Set(nodes.map((n) => n.id));
+    edges = filterEdgesForNodes(edges, ids);
+  }
+
   return {
-    nodes: visToFlowNodes(view.nodes, mode),
-    edges: visToFlowEdges(view.edges),
+    nodes: visToFlowNodes(nodes, mode),
+    edges: visToFlowEdges(edges),
+    truncated,
   };
 }
 

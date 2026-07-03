@@ -1,5 +1,5 @@
 import { DiagramsPage } from "@/pages/DiagramsPage";
 
 export function DependencyGraphPage() {
-  return <DiagramsPage initialTab="dependency" />;
+  return <DiagramsPage view="dependency" />;
 }

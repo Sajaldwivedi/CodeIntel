@@ -5,6 +5,7 @@ import {
   Database,
   GitBranch,
   Loader2,
+  Network,
   ScanSearch,
   Sparkles,
   XCircle,
@@ -22,6 +23,7 @@ const PIPELINE_STEPS: {
   { stage: "validating", label: "Validate", icon: GitBranch },
   { stage: "cloning", label: "Clone", icon: GitBranch },
   { stage: "parsing", label: "Parse", icon: ScanSearch },
+  { stage: "graphing", label: "Graph", icon: Network },
   { stage: "indexing", label: "Index", icon: Database },
   { stage: "embedding", label: "Embed", icon: Sparkles },
 ];
@@ -31,6 +33,7 @@ const STAGE_ORDER: IngestionStage[] = [
   "validating",
   "cloning",
   "parsing",
+  "graphing",
   "indexing",
   "embedding",
   "completed",
@@ -38,7 +41,7 @@ const STAGE_ORDER: IngestionStage[] = [
 
 function stageIndex(stage: IngestionStage): number {
   const idx = STAGE_ORDER.indexOf(stage);
-  return idx === -1 ? 0 : idx;
+  return idx === -1 ? STAGE_ORDER.indexOf("parsing") : idx;
 }
 
 function StepIcon({
@@ -93,7 +96,7 @@ export function IngestionProgress({ job, className }: IngestionProgressProps) {
       </div>
 
       {/* Step tracker */}
-      <ol className="mt-6 grid gap-2 sm:grid-cols-5">
+      <ol className="mt-6 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {PIPELINE_STEPS.map((step) => {
           const stepIdx = stageIndex(step.stage);
           const done = !failed && (job.stage === "completed" || currentIdx > stepIdx);

@@ -5,6 +5,7 @@ export type IngestionStage =
   | "validating"
   | "cloning"
   | "parsing"
+  | "graphing"
   | "indexing"
   | "embedding"
   | "completed"

@@ -11,11 +11,11 @@ from services.graph.query_engine import GraphQueryEngine
 
 
 _SYSTEM_TIER: dict[str, tuple[str, str, float]] = {
-    "frontend": ("Frontend", "frontend", 0.0),
-    "presentation": ("API Layer", "backend", 0.25),
-    "business": ("Services", "service", 0.5),
-    "data": ("Database", "database", 0.75),
-    "infrastructure": ("Infrastructure", "util", 0.85),
+    "frontend": ("Frontend", "frontend", 0.08),
+    "presentation": ("API Layer", "backend", 0.32),
+    "business": ("Services", "service", 0.52),
+    "data": ("Database", "database", 0.72),
+    "infrastructure": ("Infrastructure", "util", 0.92),
 }
 
 
@@ -141,8 +141,8 @@ class DiagramGenerator:
                     group="presentation",
                     description=ep.get("handler") or "",
                     file_path=ep.get("file_path") or "",
-                    x=0.22,
-                    y=0.15 + i * 0.12,
+                    x=0.28,
+                    y=0.12 + i * 0.13,
                 ),
             )
             if "presentation" in tier_ids:

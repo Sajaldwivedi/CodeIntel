@@ -10,7 +10,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Schema DDL executed once per process to enable indexed lookups.
-_SCHEMA_STATEMENTS: tuple[str, ...] = (
+_CONSTRAINT_STATEMENTS: tuple[str, ...] = (
     "CREATE CONSTRAINT graph_repository_id IF NOT EXISTS "
     "FOR (n:Repository) REQUIRE n.id IS UNIQUE",
     "CREATE CONSTRAINT graph_file_id IF NOT EXISTS "
@@ -27,12 +27,41 @@ _SCHEMA_STATEMENTS: tuple[str, ...] = (
     "FOR (n:DatabaseTable) REQUIRE n.id IS UNIQUE",
     "CREATE CONSTRAINT graph_library_id IF NOT EXISTS "
     "FOR (n:ExternalLibrary) REQUIRE n.id IS UNIQUE",
-    "CREATE INDEX graph_repo_id IF NOT EXISTS FOR (n) ON (n.repo_id)",
-    "CREATE INDEX graph_node_name IF NOT EXISTS FOR (n) ON (n.name)",
-    "CREATE INDEX graph_file_path IF NOT EXISTS FOR (n:File) ON (n.path)",
-    "CREATE INDEX graph_symbol_file IF NOT EXISTS FOR (n) ON (n.file_path)",
-    "CREATE INDEX graph_qualified_name IF NOT EXISTS FOR (n:Method) ON (n.qualified_name)",
 )
+
+# Neo4j 5.x requires a label in CREATE INDEX (bare FOR (n) is invalid).
+_REPO_ID_LABELS = ("Repository", "File", "Class", "Function", "Method", "ApiEndpoint", "DatabaseTable")
+_NAME_LABELS = ("Repository", "Class", "Function", "Method", "ApiEndpoint", "DatabaseTable", "ExternalLibrary")
+_FILE_PATH_LABELS = ("Class", "Function", "Method", "ApiEndpoint", "DatabaseTable")
+
+
+def _build_index_statements() -> tuple[str, ...]:
+    statements: list[str] = []
+    for label in _REPO_ID_LABELS:
+        slug = label.lower()
+        statements.append(
+            f"CREATE INDEX graph_{slug}_repo_id IF NOT EXISTS FOR (n:{label}) ON (n.repo_id)",
+        )
+    for label in _NAME_LABELS:
+        slug = label.lower()
+        statements.append(
+            f"CREATE INDEX graph_{slug}_name IF NOT EXISTS FOR (n:{label}) ON (n.name)",
+        )
+    for label in _FILE_PATH_LABELS:
+        slug = label.lower()
+        statements.append(
+            f"CREATE INDEX graph_{slug}_file_path IF NOT EXISTS FOR (n:{label}) ON (n.file_path)",
+        )
+    statements.extend(
+        (
+            "CREATE INDEX graph_file_path IF NOT EXISTS FOR (n:File) ON (n.path)",
+            "CREATE INDEX graph_method_qualified_name IF NOT EXISTS FOR (n:Method) ON (n.qualified_name)",
+        ),
+    )
+    return tuple(statements)
+
+
+_SCHEMA_STATEMENTS: tuple[str, ...] = _CONSTRAINT_STATEMENTS + _build_index_statements()
 
 _schema_ready = False
 

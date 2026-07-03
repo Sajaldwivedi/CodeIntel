@@ -185,3 +185,14 @@ class TestGraphQueryEngine:
         layers = engine.detect_architecture_layers("acme/app")
         assert layers[0].layer == "presentation"
         assert layers[0].file_count == 2
+
+
+class TestGraphSchema:
+    def test_index_statements_use_neo4j5_label_syntax(self) -> None:
+        from services.graph.service import _SCHEMA_STATEMENTS
+
+        for statement in _SCHEMA_STATEMENTS:
+            if not statement.startswith("CREATE INDEX"):
+                continue
+            assert "FOR (n:" in statement, f"Index must specify a label: {statement}"
+            assert "FOR (n) ON" not in statement, f"Label-less index is invalid in Neo4j 5: {statement}"

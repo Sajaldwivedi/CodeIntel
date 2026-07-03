@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Layers, Loader2, Network, Workflow } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 import { fetchDiagrams, type DiagramBundle } from "@/api/diagrams";
+import { toApiErrorMessage } from "@/api/client";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ExportToolbar } from "@/components/diagrams/ExportToolbar";
@@ -14,24 +16,62 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRepoStore } from "@/store/repoStore";
 import { encodeRepoId, repoIdFromSelection } from "@/utils/repoId";
-import { toApiErrorMessage } from "@/api/client";
 
 export type DiagramTab = "system" | "dependency" | "mermaid";
+export type DiagramView = DiagramTab | "all";
 
 interface DiagramsPageProps {
-  initialTab?: DiagramTab;
+  /** When set, show only this view (no tab switcher). */
+  view?: DiagramView;
 }
 
-export function DiagramsPage({ initialTab = "system" }: DiagramsPageProps) {
+const VIEW_META: Record<
+  Exclude<DiagramView, "all">,
+  { title: string; description: string; icon: typeof Workflow }
+> = {
+  system: {
+    title: "System Architecture",
+    description: "Layered view: Frontend → API → Services → Database",
+    icon: Workflow,
+  },
+  dependency: {
+    title: "Dependency Graph",
+    description: "Module import relationships across the codebase",
+    icon: Network,
+  },
+  mermaid: {
+    title: "Mermaid Diagrams",
+    description: "Flowchart, sequence, and class diagrams",
+    icon: Layers,
+  },
+};
+
+function tabFromPath(pathname: string): DiagramTab {
+  if (pathname.startsWith("/dependencies")) return "dependency";
+  if (pathname.startsWith("/architecture")) return "system";
+  return "system";
+}
+
+export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
+  const location = useLocation();
   const repositories = useRepoStore((s) => s.repositories);
   const selectedId = useRepoStore((s) => s.selectedRepoId);
   const activeRepo = repositories.find((r) => r.id === selectedId) ?? repositories[0];
 
-  const [tab, setTab] = useState<DiagramTab>(initialTab);
+  const routeTab = tabFromPath(location.pathname);
+  const [tab, setTab] = useState<DiagramTab>(view === "all" ? routeTab : view);
   const [bundle, setBundle] = useState<DiagramBundle | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  const activeView: DiagramTab = view === "all" ? tab : view;
+
+  useEffect(() => {
+    if (view === "all") {
+      setTab(routeTab);
+    }
+  }, [view, routeTab]);
 
   const load = useCallback(async () => {
     if (!activeRepo) {
@@ -56,57 +96,92 @@ export function DiagramsPage({ initialTab = "system" }: DiagramsPageProps) {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
-
   const systemFlow = useMemo(
-    () => (bundle ? graphViewToFlow(bundle.system_architecture, "system") : { nodes: [], edges: [] }),
+    () => (bundle ? graphViewToFlow(bundle.system_architecture, "system") : { nodes: [], edges: [], truncated: false }),
     [bundle],
   );
   const depFlow = useMemo(
-    () => (bundle ? graphViewToFlow(bundle.dependency_graph, "dependency") : { nodes: [], edges: [] }),
+    () => (bundle ? graphViewToFlow(bundle.dependency_graph, "dependency") : { nodes: [], edges: [], truncated: false }),
     [bundle],
   );
 
-  const headerIcon = tab === "dependency" ? Network : Workflow;
+  const meta = VIEW_META[activeView === "mermaid" ? "mermaid" : activeView];
+  const Icon = meta.icon;
+
+  const renderSystem = () => (
+    <>
+      <InteractiveGraph
+        graphKey={`system-${bundle?.repo_id ?? "none"}`}
+        nodes={systemFlow.nodes}
+        edges={systemFlow.edges}
+        exportRef={viewportRef}
+        emptyMessage="No system architecture graph indexed for this repository."
+      />
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        Pan, zoom, and drag nodes · {systemFlow.nodes.length} components, {systemFlow.edges.length} links
+      </p>
+    </>
+  );
+
+  const renderDependency = () => (
+    <>
+      <InteractiveGraph
+        graphKey={`dependency-${bundle?.repo_id ?? "none"}`}
+        nodes={depFlow.nodes}
+        edges={depFlow.edges}
+        exportRef={viewportRef}
+        emptyMessage="No import/dependency edges indexed for this repository."
+      />
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        {depFlow.truncated
+          ? `Showing top ${depFlow.nodes.length} modules by connectivity · `
+          : ""}
+        {depFlow.nodes.length} modules, {depFlow.edges.length} imports
+      </p>
+    </>
+  );
+
+  const renderMermaid = () => (
+    <div ref={viewportRef} className="grid gap-4 lg:grid-cols-2">
+      <MermaidPanel title="Flowchart" source={bundle!.mermaid.flowchart} />
+      <MermaidPanel title="Sequence diagram" source={bundle!.mermaid.sequence} />
+      <Card className="lg:col-span-2">
+        <CardContent className="p-4">
+          <MermaidPanel title="Class diagram" source={bundle!.mermaid.class_diagram} />
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Architecture Diagrams"
+        title={view === "all" ? "Architecture Diagrams" : meta.title}
         description={
           activeRepo
-            ? `Generated from graph data for ${activeRepo.owner}/${activeRepo.name}`
-            : "Select a repository to generate diagrams"
+            ? `${meta.description} · ${activeRepo.owner}/${activeRepo.name}`
+            : meta.description
         }
-        icon={headerIcon === Network ? <Network /> : <Workflow />}
+        icon={<Icon />}
         actions={
           bundle ? (
-            <ExportToolbar bundle={bundle} viewportRef={viewportRef} activeTab={tab} />
+            <ExportToolbar bundle={bundle} viewportRef={viewportRef} activeTab={activeView} />
           ) : loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : null
         }
       />
 
-      {bundle && (
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">Frontend → API → Services → DB</Badge>
-          {Object.entries(bundle.stats)
-            .slice(0, 5)
-            .map(([k, v]) => (
-              <Badge key={k} variant="secondary">
-                {k}: {v}
-              </Badge>
-            ))}
-        </div>
+      {bundle && activeView === "system" && (
+        <Badge variant="secondary">Frontend → API → Services → DB</Badge>
       )}
 
       {loading ? (
         <Skeleton className="h-[620px] w-full rounded-xl" />
       ) : error ? (
         <ErrorState description={error} onRetry={load} />
+      ) : bundle && view !== "all" ? (
+        activeView === "system" ? renderSystem() : activeView === "dependency" ? renderDependency() : renderMermaid()
       ) : bundle ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as DiagramTab)}>
           <TabsList>
@@ -125,39 +200,13 @@ export function DiagramsPage({ initialTab = "system" }: DiagramsPageProps) {
           </TabsList>
 
           <TabsContent value="system" className="mt-4">
-            <InteractiveGraph
-              nodes={systemFlow.nodes}
-              edges={systemFlow.edges}
-              exportRef={viewportRef}
-              emptyMessage="No system architecture graph indexed for this repository."
-            />
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              Pan, zoom, and drag nodes · {systemFlow.nodes.length} components, {systemFlow.edges.length} links
-            </p>
+            {tab === "system" && renderSystem()}
           </TabsContent>
-
           <TabsContent value="dependency" className="mt-4">
-            <InteractiveGraph
-              nodes={depFlow.nodes}
-              edges={depFlow.edges}
-              exportRef={viewportRef}
-              emptyMessage="No import/dependency edges indexed for this repository."
-            />
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              File import graph · {depFlow.nodes.length} modules, {depFlow.edges.length} imports
-            </p>
+            {tab === "dependency" && renderDependency()}
           </TabsContent>
-
           <TabsContent value="mermaid" className="mt-4">
-            <div ref={viewportRef} className="grid gap-4 lg:grid-cols-2">
-              <MermaidPanel title="Flowchart" source={bundle.mermaid.flowchart} />
-              <MermaidPanel title="Sequence diagram" source={bundle.mermaid.sequence} />
-              <Card className="lg:col-span-2">
-                <CardContent className="p-4">
-                  <MermaidPanel title="Class diagram" source={bundle.mermaid.class_diagram} />
-                </CardContent>
-              </Card>
-            </div>
+            {tab === "mermaid" && renderMermaid()}
           </TabsContent>
         </Tabs>
       ) : null}
