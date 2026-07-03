@@ -56,7 +56,7 @@ It's built for developers who join an unfamiliar codebase, review large PRs, or 
 
 **Upload & ingestion flow**
 
-![Upload flow](docs/gifs/upload-flow.gif)
+![Upload flow](docs/screenshots/upload-flow.png)
 
 ---
 
