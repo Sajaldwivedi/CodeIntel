@@ -40,8 +40,6 @@ It's built for developers who join an unfamiliar codebase, review large PRs, or 
 
 ## Demo
 
-> Screenshots and recordings. Replace the placeholders below with real assets in `docs/`.
-
 **Dashboard**
 
 ![Dashboard](docs/screenshots/dashboard.png)
