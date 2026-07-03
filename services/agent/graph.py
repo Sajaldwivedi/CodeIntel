@@ -11,7 +11,8 @@ from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from services.agent.models import NOT_FOUND, PlanStep, ToolExecutionResult
+from services.agent.models import PlanStep, ToolExecutionResult
+from services.agent.synthesis import synthesize_answer
 from services.agent.tools import AgentToolContext, run_tool
 from services.llm.base import LLMProvider
 from services.retrieval.models import CodeCitation
@@ -47,6 +48,27 @@ def _heuristic_plan(question: str) -> list[PlanStep]:
     lowered = question.lower()
     steps: list[PlanStep] = []
 
+    if any(
+        k in lowered
+        for k in (
+            "how does this project",
+            "how does the project",
+            "how this project",
+            "how it work",
+            "what is this project",
+            "what does this project",
+            "project work",
+            "overview",
+            "how does this repo",
+            "how does this app",
+        )
+    ):
+        steps.append(PlanStep("generate_architecture", {}, "Map system architecture layers."))
+        steps.append(PlanStep("trace_request_flow", {}, "Trace main API request flows."))
+        steps.append(
+            PlanStep("search_code", {"query": "main application entry point startup"}, "Find entry points."),
+        )
+
     if any(k in lowered for k in ("architecture", "layer", "structure")):
         steps.append(PlanStep("generate_architecture", {}, "Map repository architecture layers."))
     if any(k in lowered for k in ("call chain", "request flow", "endpoint", "route", "api")):
@@ -61,10 +83,13 @@ def _heuristic_plan(question: str) -> list[PlanStep]:
     if symbol and any(k in lowered for k in ("explain", "how does", "what does")):
         steps.append(PlanStep("explain_function", {"symbol": symbol, "query": question}, "Explain symbol."))
 
-    steps.append(PlanStep("search_code", {"query": question}, "Semantic code search."))
+    if not steps:
+        steps.append(PlanStep("search_code", {"query": question}, "Semantic code search."))
     if len(steps) < 2:
         steps.insert(0, PlanStep("search_graph", {"query": question}, "Graph symbol search."))
-    return steps[:5]
+    elif "search_code" not in {s.tool for s in steps}:
+        steps.append(PlanStep("search_code", {"query": question}, "Semantic code search."))
+    return steps[:6]
 
 
 def _extract_symbol(question: str) -> str:
@@ -119,6 +144,7 @@ def build_agent_graph(ctx: AgentToolContext, llm: LLMProvider | None):
         if llm is not None:
             prompt = f"""You are an AI Software Engineer planning repository analysis.
 
+Repository: {state.get("repo_id", "")}
 Question: {question}
 Recent conversation:
 {history_text or '(none)'}
@@ -135,6 +161,7 @@ Return JSON only:
 
 Rules:
 - Plan at least 2 tools unless the question is extremely narrow.
+- For project overview / "how does this work" questions use generate_architecture, trace_request_flow, and search_code.
 - Prefer multi-step investigation before answering."""
             try:
                 raw = llm.complete(prompt, system="Output JSON only.", temperature=0.1)
@@ -182,64 +209,22 @@ Rules:
 
     def synthesize_node(state: AgentState) -> dict[str, Any]:
         question = state["question"]
+        repo_id = state.get("repo_id", "")
         tool_results = state.get("tool_results") or []
-        found_any = any(r.get("found") for r in tool_results)
+        citations = state.get("citations") or []
 
-        if not found_any:
-            return {
-                "final_answer": NOT_FOUND,
-                "confidence": 0.0,
-                "reasoning_steps": ["Synthesis: no repository evidence collected."],
-            }
+        answer, confidence, reasoning = synthesize_answer(
+            repo_id=repo_id,
+            question=question,
+            tool_results=tool_results,
+            citations=citations,
+            llm=llm,
+        )
 
-        if llm is not None:
-            context = json.dumps(tool_results, indent=2)[:12000]
-            prompt = f"""Answer using ONLY the tool evidence below. Never invent files, functions, or behavior.
-
-Question: {question}
-
-Tool evidence:
-{context}
-
-Return JSON only:
-{{
-  "answer": "detailed final answer with file/function references",
-  "confidence": 0.0,
-  "reasoning_summary": "how evidence supports the answer"
-}}
-
-If evidence is insufficient, set answer to "{NOT_FOUND}" and confidence to 0."""
-            try:
-                raw = llm.complete(
-                    prompt,
-                    system="Ground answers strictly in tool evidence. No hallucination.",
-                    temperature=0.1,
-                )
-                text = raw.strip()
-                if text.startswith("```"):
-                    text = re.sub(r"^```(?:json)?\s*", "", text)
-                    text = re.sub(r"\s*```$", "", text)
-                data = json.loads(text)
-                answer = str(data.get("answer") or NOT_FOUND).strip()
-                confidence = float(data.get("confidence") or 0.0)
-                reasoning = str(data.get("reasoning_summary") or "")
-                return {
-                    "final_answer": answer,
-                    "confidence": min(1.0, max(0.0, confidence)),
-                    "reasoning_steps": [f"Synthesis: {reasoning}"],
-                }
-            except Exception:
-                logger.warning("Agent synthesis LLM failed; using extractive fallback.", exc_info=True)
-
-        summaries = [r.get("summary") for r in tool_results if r.get("found")]
         return {
-            "final_answer": (
-                "Based on repository analysis:\n- " + "\n- ".join(summaries[:5])
-                if summaries
-                else NOT_FOUND
-            ),
-            "confidence": 0.55 if summaries else 0.0,
-            "reasoning_steps": ["Synthesis: extractive summary from tool outputs."],
+            "final_answer": answer,
+            "confidence": confidence,
+            "reasoning_steps": [f"Synthesis: {reasoning}"],
         }
 
     graph = StateGraph(AgentState)

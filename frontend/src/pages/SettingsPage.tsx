@@ -73,7 +73,7 @@ export function SettingsPage() {
 
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState("sk-••••••••••••••••••••••••");
-  const [provider, setProvider] = useState<"openai" | "gemini">("openai");
+  const [provider, setProvider] = useState<"openai" | "groq">("groq");
 
   const saveKeys = () => toast.success("Settings saved", { description: "Your provider configuration was updated." });
 
@@ -120,7 +120,7 @@ export function SettingsPage() {
         <Section icon={<KeyRound />} title="LLM Provider" description="Connect your model provider for retrieval and generation.">
           <Row label="Provider" hint="Used for embeddings and answer generation.">
             <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
-              {(["openai", "gemini"] as const).map((p) => (
+              {(["openai", "groq"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setProvider(p)}

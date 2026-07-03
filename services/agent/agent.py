@@ -8,6 +8,7 @@ import uuid
 from services.agent.graph import build_agent_graph, dict_to_citation
 from services.agent.memory import RepoConversationMemory, get_conversation_memory
 from services.agent.models import AgentResponse
+from services.agent.synthesis import try_meta_answer
 from services.agent.tools import AgentToolContext
 from services.graph.query_engine import GraphQueryEngine
 from services.llm.base import LLMProvider
@@ -45,7 +46,25 @@ class SoftwareEngineerAgent:
         session_id: str | None = None,
     ) -> AgentResponse:
         session = session_id or f"{repo_id}::default"
+        question = question.strip()
         history = self._memory.history(repo_id, session, limit=12)
+
+        meta = try_meta_answer(repo_id, question)
+        if meta is not None:
+            answer, confidence, reasoning = meta
+            self._memory.append(repo_id, session, "user", question)
+            self._memory.append(repo_id, session, "assistant", answer)
+            return AgentResponse(
+                repo_id=repo_id,
+                session_id=session,
+                question=question,
+                answer=answer,
+                confidence=confidence,
+                reasoning_steps=[f"Synthesis: {reasoning}"],
+                plan=[],
+                tools_used=[],
+                citations=[],
+            )
 
         ctx = AgentToolContext(
             repo_id=repo_id,
@@ -59,7 +78,7 @@ class SoftwareEngineerAgent:
             {
                 "repo_id": repo_id,
                 "session_id": session,
-                "question": question.strip(),
+                "question": question,
                 "history": history,
                 "plan_steps": [],
                 "step_index": 0,

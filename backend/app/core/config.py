@@ -77,11 +77,12 @@ class Settings(BaseSettings):
     ingestion_workspace_dir: str = "../data/ingestion"
 
     # --- LLM provider abstraction (answer generation) ---
-    llm_provider: str = "gemini"
+    llm_provider: str = "groq"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
-    gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    groq_api_key: str | None = None
+    llm_model: str = "llama-3.3-70b-versatile"
+    llm_fallback_model: str = "llama-3.1-8b-instant"
 
     # --- Hybrid retrieval ---
     retrieval_top_k: int = 8

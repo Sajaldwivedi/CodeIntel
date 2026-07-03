@@ -10,6 +10,7 @@ from fastapi import Request
 
 from app.core.config import Settings, get_settings
 from app.services.ingestion.pipeline import IngestionPipeline
+from app.services.llm_service import LLMService, build_llm_service
 from services.agent import SoftwareEngineerAgent, get_conversation_memory
 from services.graph import GraphQueryEngine, GraphService
 from services.retrieval import HybridRetrievalPipeline
@@ -41,14 +42,27 @@ def get_graph_query_engine(request: Request) -> GraphQueryEngine:
     return GraphQueryEngine(graph)
 
 
+def get_llm_service(request: Request) -> LLMService:
+    """Return the Groq-backed LLM service for the current request."""
+    return build_llm_service(get_app_settings(request))
+
+
+def _resolve_llm_provider(settings: Settings):
+    """Return the configured LLM provider, or None if misconfigured."""
+    from services.llm.base import LLMProviderError
+
+    try:
+        return build_llm_service(settings).provider
+    except LLMProviderError:
+        return None
+
+
 def get_hybrid_retrieval_pipeline(request: Request) -> HybridRetrievalPipeline:
     """Build a hybrid retrieval pipeline for the current request."""
     settings = get_app_settings(request)
 
     from services.embeddings.chroma_store import ChromaEmbeddingStore
     from services.embeddings.embedding_service import JinaEmbeddingService
-    from services.llm.factory import create_llm_provider
-    from services.llm.base import LLMProviderError
 
     if not settings.jina_api_key:
         from app.middleware.error_handler import ValidationError
@@ -80,17 +94,7 @@ def get_hybrid_retrieval_pipeline(request: Request) -> HybridRetrievalPipeline:
         except Exception:
             graph_engine = None
 
-    llm = None
-    try:
-        llm = create_llm_provider(
-            settings.llm_provider,
-            openai_api_key=settings.openai_api_key,
-            openai_model=settings.openai_model,
-            gemini_api_key=settings.gemini_api_key,
-            gemini_model=settings.gemini_model,
-        )
-    except LLMProviderError:
-        llm = None
+    llm = _resolve_llm_provider(settings)
 
     return HybridRetrievalPipeline(
         chroma_store=chroma,
@@ -109,8 +113,6 @@ def get_software_engineer_agent(request: Request) -> SoftwareEngineerAgent:
 
     from services.embeddings.chroma_store import ChromaEmbeddingStore
     from services.embeddings.embedding_service import JinaEmbeddingService
-    from services.llm.base import LLMProviderError
-    from services.llm.factory import create_llm_provider
 
     if not settings.jina_api_key:
         from app.middleware.error_handler import ValidationError
@@ -142,17 +144,7 @@ def get_software_engineer_agent(request: Request) -> SoftwareEngineerAgent:
         except Exception:
             graph_engine = None
 
-    llm = None
-    try:
-        llm = create_llm_provider(
-            settings.llm_provider,
-            openai_api_key=settings.openai_api_key,
-            openai_model=settings.openai_model,
-            gemini_api_key=settings.gemini_api_key,
-            gemini_model=settings.gemini_model,
-        )
-    except LLMProviderError:
-        llm = None
+    llm = _resolve_llm_provider(settings)
 
     vector = VectorRetriever(chroma, embedder)
     graph_retriever = GraphRetriever(graph_engine) if graph_engine is not None else None

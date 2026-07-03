@@ -94,8 +94,31 @@ npm run dev
 
 ```bash
 cd backend
+pip install -r requirements.txt -r requirements-dev.txt
 PYTHONPATH=.. pytest -q
 ```
+
+## LLM provider (Groq)
+
+Answer generation and the LangGraph agent use [Groq](https://groq.com/) via the official Python SDK.
+
+```bash
+pip install groq
+```
+
+Add to `.env`:
+
+```env
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key
+LLM_MODEL=llama-3.3-70b-versatile
+LLM_FALLBACK_MODEL=llama-3.1-8b-instant
+```
+
+Switch models by changing `LLM_MODEL` (for example `llama-3.1-8b-instant` for lower latency).
+If the primary model is unavailable, the provider automatically retries with `LLM_FALLBACK_MODEL`.
+
+Embeddings remain on **Jina AI** (`JINA_API_KEY`); only the answering LLM uses Groq.
 
 ## Roadmap
 

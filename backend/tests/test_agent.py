@@ -38,6 +38,25 @@ class TestAgentTools:
         assert not result.found
         assert result.summary == NOT_FOUND
 
+    def test_generate_architecture_serializes_layers(self) -> None:
+        from services.agent.tools import generate_architecture
+        from services.graph.models import ArchitectureLayer
+
+        engine = MagicMock()
+        engine.detect_architecture_layers.return_value = [
+            ArchitectureLayer("presentation", 3, 5, ["routes/api.py"]),
+        ]
+        engine.cross_layer_calls.return_value = []
+        ctx = AgentToolContext(
+            repo_id="owner/repo",
+            vector=MagicMock(),
+            graph=None,
+            graph_engine=engine,
+        )
+        result = generate_architecture(ctx)
+        assert result.found
+        assert result.data[0]["layer"] == "presentation"
+
     def test_find_bug_patterns_detects_bare_except(self) -> None:
         vector = MagicMock()
         vector.search.return_value = [_hit("bad.py", "try:\n    x()\nexcept:\n    pass\n")]
@@ -50,6 +69,28 @@ class TestAgentTools:
 
 
 class TestAgentGraph:
+    def test_meta_owner_answer(self) -> None:
+        agent = SoftwareEngineerAgent(
+            vector=MagicMock(),
+            graph=None,
+            graph_engine=None,
+            llm=None,
+            memory=RepoConversationMemory(),
+        )
+        result = agent.run("Sajaldwivedi/VeriSight-AI", "who is the owner of this repo")
+        assert "Sajaldwivedi" in result.answer
+        assert result.confidence >= 0.9
+        assert result.tools_used == []
+
+    def test_heuristic_plan_for_project_overview(self) -> None:
+        from services.agent.graph import _heuristic_plan
+
+        steps = _heuristic_plan("how does this project work?")
+        tools = [s.tool for s in steps]
+        assert "generate_architecture" in tools
+        assert "trace_request_flow" in tools
+        assert "search_code" in tools
+
     def test_heuristic_plan_uses_multiple_tools(self) -> None:
         from services.agent.graph import _heuristic_plan
 

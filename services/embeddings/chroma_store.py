@@ -98,7 +98,7 @@ class ChromaEmbeddingStore:
         """Drop and recreate the collection when embedding dimensionality changes.
 
         Chroma fixes vector dimension on first insert; switching embedding
-        providers (e.g. Gemini 3072 → Jina 1024) requires a full reset.
+        providers (e.g. legacy 3072-dim vectors → Jina 1024) requires a full reset.
         """
         current = self.get_collection_embedding_dimension()
         if current is None or current == expected_dim:

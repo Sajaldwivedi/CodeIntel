@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import asdict
 from dataclasses import dataclass
 
 from services.agent.models import NOT_FOUND, ToolExecutionResult
@@ -146,7 +147,7 @@ def generate_architecture(ctx: AgentToolContext) -> ToolExecutionResult:
         found=True,
         summary=f"Detected {len(layers)} architecture layers with {len(cross)} cross-layer calls.",
         data=[
-            {"type": "layer", **layer.__dict__} for layer in layers
+            {"type": "layer", **asdict(layer)} for layer in layers
         ]
         + [{"type": "cross_layer_call", **row} for row in cross[:20]],
         citations=[],

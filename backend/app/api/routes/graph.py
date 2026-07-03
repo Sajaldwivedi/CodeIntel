@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_graph_query_engine
@@ -47,7 +49,7 @@ async def get_dependencies(
     return DependencyResponse(
         repo_id=decoded,
         symbol=symbol,
-        dependencies=[DependencyItem(**dep.__dict__) for dep in deps],
+        dependencies=[DependencyItem(**asdict(dep)) for dep in deps],
     )
 
 
@@ -101,7 +103,7 @@ async def get_architecture(
         raise NotFoundError(f"No graph data found for repository '{decoded}'.")
     return ArchitectureResponse(
         repo_id=decoded,
-        layers=[ArchitectureLayerItem(**layer.__dict__) for layer in layers],
+        layers=[ArchitectureLayerItem(**asdict(layer)) for layer in layers],
         cross_layer_calls=cross_layer,
     )
 
