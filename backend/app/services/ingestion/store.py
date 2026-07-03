@@ -158,6 +158,13 @@ class IngestionStore:
         job = IngestionJob(id=job_id, source=source, owner=owner, name=name)
         async with self._lock:
             self._jobs[job_id] = job
+        try:
+            from app.core.config import get_settings
+            from app.services.ingestion.job_store import save_job_snapshot
+
+            save_job_snapshot(get_settings().ingestion_workspace_path, job)
+        except Exception:
+            pass
         return job
 
     async def get_job(self, job_id: str) -> IngestionJob | None:

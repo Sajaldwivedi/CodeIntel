@@ -1,16 +1,10 @@
-# Keep build contexts small and reproducible.
-**/__pycache__/
-**/*.py[cod]
-**/.pytest_cache/
-**/.mypy_cache/
-**/.ruff_cache/
-**/.venv/
-**/venv/
-
-frontend/node_modules/
-frontend/dist/
-**/.vite/
-
-.git/
-.env
-*.log
+.git
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+**/.env
+data/
+frontend/node_modules
+frontend/dist
+**/.cursor
+terminals/

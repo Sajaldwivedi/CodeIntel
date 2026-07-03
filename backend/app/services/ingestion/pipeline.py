@@ -45,7 +45,7 @@ class IngestionPipeline:
             owner=parsed.owner,
             name=parsed.name,
         )
-        asyncio.create_task(self._run_github(job, parsed, token))
+        await self._dispatch_github(job, parsed, token, url=url)
         return job
 
     async def start_zip_ingestion(
@@ -56,8 +56,52 @@ class IngestionPipeline:
         name: str,
     ) -> IngestionJob:
         job = await self._store.create_job(source="zip", owner=owner, name=name)
-        asyncio.create_task(self._run_zip(job, archive_path))
+        await self._dispatch_zip(job, archive_path)
         return job
+
+    async def _dispatch_github(
+        self,
+        job: IngestionJob,
+        parsed: ParsedGitHubUrl,
+        token: str | None,
+        *,
+        url: str,
+    ) -> None:
+        if self._settings.ingestion_use_worker:
+            from services.queue import create_redis_client, enqueue_ingestion_task
+
+            client = create_redis_client(self._settings.redis_url)
+            await enqueue_ingestion_task(
+                client,
+                {
+                    "type": "github",
+                    "job_id": job.id,
+                    "url": url,
+                    "token": token,
+                },
+            )
+            await client.aclose()
+            job.update(stage=IngestionStage.QUEUED, message="Queued for background processing…")
+            return
+        asyncio.create_task(self._run_github(job, parsed, token))
+
+    async def _dispatch_zip(self, job: IngestionJob, archive_path: Path) -> None:
+        if self._settings.ingestion_use_worker:
+            from services.queue import create_redis_client, enqueue_ingestion_task
+
+            client = create_redis_client(self._settings.redis_url)
+            await enqueue_ingestion_task(
+                client,
+                {
+                    "type": "zip",
+                    "job_id": job.id,
+                    "archive_path": str(archive_path.resolve()),
+                },
+            )
+            await client.aclose()
+            job.update(stage=IngestionStage.QUEUED, message="Queued for background processing…")
+            return
+        asyncio.create_task(self._run_zip(job, archive_path))
 
     async def _run_github(
         self,

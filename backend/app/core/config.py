@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # --- Repository ingestion ---
     # Outside ``backend/`` so uvicorn --reload does not restart mid-clone.
     ingestion_workspace_dir: str = "../data/ingestion"
+    ingestion_use_worker: bool = False
+
+    # --- Redis (background worker queue) ---
+    redis_url: str = "redis://localhost:6379/0"
 
     # --- LLM provider abstraction (answer generation) ---
     llm_provider: str = "groq"

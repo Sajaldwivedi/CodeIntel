@@ -1,16 +1,26 @@
-# Frontend dev image (Vite dev server). A separate multi-stage build image will
-# be introduced for production static hosting in a later phase.
-FROM node:20-alpine AS base
+# Production frontend image (Vite build + nginx).
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching.
-COPY frontend/package.json /app/package.json
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
-# Copy the rest of the frontend source.
-COPY frontend /app
+COPY frontend ./
 
-EXPOSE 5173
+ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
+  CMD wget -q --spider http://localhost/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
