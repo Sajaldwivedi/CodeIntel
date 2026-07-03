@@ -53,6 +53,15 @@ class IngestionStartResponse(BaseModel):
     message: str = "Ingestion started."
 
 
+class DeleteIngestionResponse(BaseModel):
+    """Response returned after deleting an ingestion job."""
+
+    job_id: str
+    repo_id: str | None = None
+    deleted: dict[str, int | bool] = Field(default_factory=dict)
+    message: str = "Repository removed."
+
+
 class RepositoryMetadataResponse(BaseModel):
     """Final repository metadata after successful ingestion."""
 

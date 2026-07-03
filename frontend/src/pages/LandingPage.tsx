@@ -42,16 +42,13 @@ export function LandingPage() {
 
       {/* Nav */}
       <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Logo />
+        <Logo to="/" />
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
           <a href="#features" className="transition-colors hover:text-foreground">Features</a>
           <a href="#stats" className="transition-colors hover:text-foreground">Platform</a>
           <a href="#" className="transition-colors hover:text-foreground">Docs</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard">Sign in</Link>
-          </Button>
           <Button variant="gradient" size="sm" asChild>
             <Link to="/dashboard">Launch app</Link>
           </Button>
@@ -200,7 +197,7 @@ export function LandingPage() {
 
       <footer className="border-t border-white/10 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
-          <Logo />
+          <Logo to="/" />
           <p>© {new Date().getFullYear()} CodeIntel. Built for engineers.</p>
         </div>
       </footer>

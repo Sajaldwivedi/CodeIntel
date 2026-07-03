@@ -187,6 +187,10 @@ class IngestionStore:
         async with self._lock:
             return list(self._jobs.values())
 
+    async def remove_job(self, job_id: str) -> None:
+        async with self._lock:
+            self._jobs.pop(job_id, None)
+
 
 _store: IngestionStore | None = None
 

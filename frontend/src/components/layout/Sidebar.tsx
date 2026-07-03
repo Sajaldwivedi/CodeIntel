@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronsLeft, PanelLeft, Sparkles } from "lucide-react";
+import { ChevronsLeft, PanelLeft } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { Logo } from "@/components/common/Logo";
@@ -22,7 +22,7 @@ export function Sidebar() {
       className="sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-white/10 bg-white/[0.02] backdrop-blur-xl md:flex"
     >
       <div className={cn("flex h-16 items-center border-b border-white/10 px-4", collapsed && "justify-center px-0")}>
-        {collapsed ? <Logo showWordmark={false} /> : <Logo />}
+        {collapsed ? <Logo showWordmark={false} to="/" /> : <Logo to="/" />}
       </div>
 
       <TooltipProvider delayDuration={0}>
@@ -72,19 +72,6 @@ export function Sidebar() {
           ))}
         </nav>
       </TooltipProvider>
-
-      {!collapsed && (
-        <div className="p-3">
-          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-violet-600/20 to-cyan-400/10 p-4">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <p className="mt-2 text-sm font-medium">Upgrade to Pro</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Unlimited repos & priority indexing.</p>
-            <Button variant="gradient" size="sm" className="mt-3 w-full">
-              Upgrade
-            </Button>
-          </div>
-        </div>
-      )}
 
       <div className="border-t border-white/10 p-3">
         <Button

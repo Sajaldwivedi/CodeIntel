@@ -29,6 +29,10 @@ export async function getIngestionStatus(jobId: string): Promise<IngestionJob> {
   return data;
 }
 
+export async function deleteIngestionJob(jobId: string): Promise<void> {
+  await apiClient.delete(`/ingestion/${jobId}`, { timeout: 60_000 });
+}
+
 export async function getParseResults(jobId: string): Promise<ParseResultsResponse> {
   const { data } = await apiClient.get<ParseResultsResponse>(`/ingestion/${jobId}/parse`);
   return data;

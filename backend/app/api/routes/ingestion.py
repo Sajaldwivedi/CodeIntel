@@ -14,10 +14,12 @@ from app.api.deps import get_app_settings, get_ingestion_pipeline
 from app.core.config import Settings
 from app.middleware.error_handler import NotFoundError
 from app.schemas.ingestion import (
+    DeleteIngestionResponse,
     GitHubIngestionRequest,
     IngestionJobResponse,
     IngestionStartResponse,
 )
+from app.services.ingestion.cleanup import delete_ingestion_job
 from app.services.ingestion.parse_store import load_parse_results, parse_output_dir
 from app.services.ingestion.pipeline import IngestionPipeline
 from app.services.ingestion.store import get_ingestion_store
@@ -101,6 +103,27 @@ async def get_ingestion_status(
     if job is None:
         raise NotFoundError(f"Ingestion job '{job_id}' not found.")
     return IngestionJobResponse(**job.to_dict())
+
+
+@router.delete(
+    "/{job_id}",
+    response_model=DeleteIngestionResponse,
+    summary="Delete an ingestion job and its indexed data",
+)
+async def delete_ingestion_job_route(
+    job_id: str,
+    settings: Settings = Depends(get_app_settings),
+) -> DeleteIngestionResponse:
+    """Remove job snapshots, parse artifacts, embeddings, and graph data."""
+    store = get_ingestion_store()
+    job = await store.get_job(job_id)
+    parse_data = load_parse_results(parse_output_dir(settings.ingestion_workspace_path), job_id)
+    if job is None and parse_data is None:
+        raise NotFoundError(f"Ingestion job '{job_id}' not found.")
+
+    result = delete_ingestion_job(settings, job_id)
+    await store.remove_job(job_id)
+    return DeleteIngestionResponse(**result)
 
 
 @router.get(

@@ -13,6 +13,7 @@ interface RepoState {
   upsertFromIngestion: (job: IngestionJob) => Repository;
   updateFromIngestion: (job: IngestionJob) => void;
   removeRepository: (id: string) => void;
+  removeRepositories: (ids: string[]) => void;
 }
 
 function jobToRepo(job: IngestionJob, existing?: Repository): Repository {
@@ -121,6 +122,18 @@ export const useRepoStore = create<RepoState>()(
           const repositories = s.repositories.filter((r) => r.id !== id);
           const selectedRepoId =
             s.selectedRepoId === id ? (repositories[0]?.id ?? null) : s.selectedRepoId;
+          return { repositories, selectedRepoId };
+        });
+      },
+
+      removeRepositories: (ids) => {
+        const idSet = new Set(ids);
+        set((s) => {
+          const repositories = s.repositories.filter((r) => !idSet.has(r.id));
+          const selectedRepoId =
+            s.selectedRepoId && idSet.has(s.selectedRepoId)
+              ? (repositories[0]?.id ?? null)
+              : s.selectedRepoId;
           return { repositories, selectedRepoId };
         });
       },

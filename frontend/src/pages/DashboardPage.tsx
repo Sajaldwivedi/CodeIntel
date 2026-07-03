@@ -1,14 +1,19 @@
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
   Boxes,
+  CheckSquare,
   Database,
   FileCode2,
   FolderGit2,
   MessageSquareText,
   Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -16,11 +21,21 @@ import { RepoCard } from "@/components/common/RepoCard";
 import { StatCard } from "@/components/common/StatCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { mockActivity } from "@/data/mock";
 import { useSimulatedLoading } from "@/hooks/useSimulatedLoading";
 import { useRepoStore } from "@/store/repoStore";
 import { formatCompact } from "@/utils/format";
+import { removeRepositoriesFromBackend } from "@/utils/repositoryCleanup";
 import { staggerContainer } from "@/utils/motion";
 import type { ActivityItem } from "@/types";
 
@@ -34,11 +49,71 @@ const ACTIVITY_STYLES: Record<ActivityItem["type"], string> = {
 export function DashboardPage() {
   const navigate = useNavigate();
   const repositories = useRepoStore((s) => s.repositories);
+  const removeRepositories = useRepoStore((s) => s.removeRepositories);
   const { isLoading } = useSimulatedLoading({ delay: 800 });
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkRemoving, setBulkRemoving] = useState(false);
+
+  const selectedRepos = useMemo(
+    () => repositories.filter((repo) => selectedIds.has(repo.id)),
+    [repositories, selectedIds],
+  );
 
   const totalChunks = repositories.reduce((acc, r) => acc + r.chunks, 0);
   const totalFiles = repositories.reduce((acc, r) => acc + r.files, 0);
   const indexed = repositories.filter((r) => r.status === "indexed").length;
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(repositories.map((r) => r.id)));
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const handleBulkRemove = async () => {
+    if (!selectedRepos.length) return;
+    setBulkRemoving(true);
+    try {
+      const { removed, failed } = await removeRepositoriesFromBackend(selectedRepos);
+      if (removed.length) {
+        removeRepositories(removed.map((repo) => repo.id));
+      }
+
+      if (removed.length && !failed.length) {
+        toast.success(
+          removed.length === 1 ? "Repository removed" : `${removed.length} repositories removed`,
+          { description: "Selected repositories were deleted from your workspace." },
+        );
+        exitSelectionMode();
+        setBulkConfirmOpen(false);
+      } else if (removed.length && failed.length) {
+        toast.warning(`Removed ${removed.length}, failed ${failed.length}`, {
+          description: failed.map((f) => `${f.repo.owner}/${f.repo.name}`).join(", "),
+        });
+        setSelectedIds(new Set(failed.map((f) => f.repo.id)));
+        setBulkConfirmOpen(false);
+      } else if (failed.length) {
+        toast.error("Failed to remove repositories", {
+          description: failed[0].error,
+        });
+      }
+    } finally {
+      setBulkRemoving(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -53,7 +128,6 @@ export function DashboardPage() {
         }
       />
 
-      {/* Stats */}
       <motion.div
         variants={staggerContainer(0.06)}
         initial="hidden"
@@ -73,13 +147,47 @@ export function DashboardPage() {
       </motion.div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Repositories */}
         <div className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Repositories</h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/upload")}>
-              View all
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {selectionMode ? (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.size} selected
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={selectedIds.size === repositories.length ? deselectAll : selectAll}>
+                    <CheckSquare />
+                    {selectedIds.size === repositories.length ? "Deselect all" : "Select all"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setBulkConfirmOpen(true)}
+                  >
+                    <Trash2 />
+                    Remove ({selectedIds.size})
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={exitSelectionMode}>
+                    <X />
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {repositories.length > 0 && (
+                    <Button variant="secondary" size="sm" onClick={() => setSelectionMode(true)}>
+                      <CheckSquare />
+                      Select
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => navigate("/upload")}>
+                    View all
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
           {isLoading ? (
@@ -108,13 +216,18 @@ export function DashboardPage() {
               className="grid gap-4 sm:grid-cols-2"
             >
               {repositories.map((repo) => (
-                <RepoCard key={repo.id} repo={repo} />
+                <RepoCard
+                  key={repo.id}
+                  repo={repo}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.has(repo.id)}
+                  onToggleSelect={toggleSelect}
+                />
               ))}
             </motion.div>
           )}
         </div>
 
-        {/* Activity feed */}
         <div>
           <div className="mb-4 flex items-center gap-2">
             <Activity className="h-4 w-4 text-muted-foreground" />
@@ -169,6 +282,41 @@ export function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Remove {selectedIds.size} {selectedIds.size === 1 ? "repository" : "repositories"}?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes the selected repositories from your workspace, including parse
+              data, embeddings, and graph indexes. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground">
+            {selectedRepos.slice(0, 12).map((repo) => (
+              <li key={repo.id} className="truncate font-mono">
+                {repo.owner}/{repo.name}
+              </li>
+            ))}
+            {selectedRepos.length > 12 && (
+              <li className="text-muted-foreground">+ {selectedRepos.length - 12} more</li>
+            )}
+          </ul>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary" disabled={bulkRemoving}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleBulkRemove} disabled={bulkRemoving}>
+              <Trash2 />
+              {bulkRemoving ? "Removing…" : `Remove ${selectedIds.size}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
