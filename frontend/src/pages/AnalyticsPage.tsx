@@ -7,7 +7,6 @@ import {
   Copy,
   FileCode2,
   FunctionSquare,
-  GitBranch,
   Layers,
   Skull,
   UploadCloud,
@@ -20,11 +19,11 @@ import { ComplexityHeatmap } from "@/components/analytics/ComplexityHeatmap";
 import { ComplexityChart, LanguageChart } from "@/components/analytics/MetricCharts";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
+import { Overline } from "@/components/common/Overline";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRepoStore } from "@/store/repoStore";
 import { encodeRepoId } from "@/utils/repoId";
@@ -78,11 +77,12 @@ export function AnalyticsPage() {
   if (!activeRepo) {
     return (
       <EmptyState
+        overline="EMPTY · NO REPOSITORY"
         icon={<BarChart3 />}
         title="No repository selected"
         description="Upload and index a repository to unlock code analytics."
         action={
-          <Button variant="gradient" onClick={() => navigate("/upload")}>
+          <Button onClick={() => navigate("/upload")}>
             <UploadCloud />
             Upload repository
           </Button>
@@ -94,55 +94,43 @@ export function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
+        overline={`Lab report · ${activeRepo.owner}/${activeRepo.name}`}
         title="Analytics"
-        description={`Code insights for ${activeRepo.owner}/${activeRepo.name} — complexity, dependencies, and health signals.`}
-        actions={
-          <Badge variant="secondary" className="gap-1.5">
-            <GitBranch className="h-3.5 w-3.5" />
-            Insights
-          </Badge>
-        }
+        description="Complexity, dependencies, and health signals extracted from the parse."
       />
 
       {activeRepo.status !== "indexed" && (
-        <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardContent className="flex items-center gap-3 py-4 text-sm text-amber-200/90">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Repository indexing must complete before analytics are available.
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 rounded-md border border-gold/30 bg-raised px-4 py-3 text-sm text-ink-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-gold" />
+          Repository indexing must complete before analytics are available.
+        </div>
       )}
 
-      {error && <ErrorState title="Analytics unavailable" description={error} onRetry={() => window.location.reload()} />}
+      {error && (
+        <ErrorState title="Analytics unavailable" description={error} onRetry={() => window.location.reload()} />
+      )}
 
       {loading && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-[116px] rounded-xl" />
+              <Skeleton key={i} className="h-[108px] rounded-lg" />
             ))}
           </div>
-          <Skeleton className="h-[320px] rounded-xl" />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-[340px] rounded-lg" />
+            <Skeleton className="h-[340px] rounded-lg" />
+          </div>
         </div>
       )}
 
       {!loading && data && (
         <motion.div variants={staggerContainer(0.05)} initial="hidden" animate="show" className="space-y-8">
           <motion.div variants={staggerContainer(0.04)} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Files" value={formatCompact(data.file_count)} icon={<FileCode2 />} accent="text-cyan-400" />
-            <StatCard
-              label="Functions"
-              value={formatCompact(data.function_count)}
-              icon={<FunctionSquare />}
-              accent="text-violet-400"
-            />
-            <StatCard label="Classes" value={formatCompact(data.class_count)} icon={<Boxes />} accent="text-fuchsia-400" />
-            <StatCard
-              label="Dependency depth"
-              value={`${data.dependency_depth}`}
-              icon={<Layers />}
-              accent="text-emerald-400"
-            />
+            <StatCard label="Files" value={formatCompact(data.file_count)} icon={<FileCode2 />} />
+            <StatCard label="Functions" value={formatCompact(data.function_count)} icon={<FunctionSquare />} />
+            <StatCard label="Classes" value={formatCompact(data.class_count)} icon={<Boxes />} />
+            <StatCard label="Dependency depth" value={`${data.dependency_depth}`} icon={<Layers />} />
           </motion.div>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -153,13 +141,13 @@ export function AnalyticsPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <HighlightCard
               title="Most complex file"
-              icon={<AlertTriangle className="h-4 w-4 text-amber-400" />}
+              tone="gold"
               symbol={data.most_complex_file}
               onOpen={openFile}
             />
             <HighlightCard
               title="Largest function"
-              icon={<FunctionSquare className="h-4 w-4 text-violet-400" />}
+              tone="ember"
               symbol={data.largest_function}
               onOpen={openFile}
             />
@@ -168,21 +156,21 @@ export function AnalyticsPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <InsightPanel
               title="Duplicate code estimate"
-              icon={<Copy className="h-4 w-4 text-cyan-400" />}
+              icon={<Copy className="h-4 w-4 text-ink-3" />}
               metric={data.duplicate_estimate}
               metricLabel="similar symbols"
               emptyText="No duplicate clusters detected."
             >
               {data.duplicate_clusters.map((cluster) => (
-                <div key={cluster.fingerprint} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{cluster.count} matches</span>
-                    <Badge variant="secondary">{(cluster.similarity * 100).toFixed(0)}% similar</Badge>
+                <div key={cluster.fingerprint} className="rounded-md border border-edge bg-raised p-3">
+                  <div className="flex items-center justify-between font-mono text-[11px]">
+                    <span className="font-medium text-ink">{cluster.count} matches</span>
+                    <span className="tnum text-ink-3">{(cluster.similarity * 100).toFixed(0)}% similar</span>
                   </div>
-                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <ul className="mt-2 space-y-1 font-mono text-[11px] text-ink-2">
                     {cluster.symbols.map((symbol) => (
-                      <li key={`${symbol.file_path}-${symbol.name}`} className="truncate font-mono">
-                        {symbol.name} · {symbol.file_path}
+                      <li key={`${symbol.file_path}-${symbol.name}`} className="truncate">
+                        {symbol.name} · <span className="text-ink-3">{symbol.file_path}</span>
                       </li>
                     ))}
                   </ul>
@@ -191,8 +179,8 @@ export function AnalyticsPage() {
             </InsightPanel>
 
             <InsightPanel
-              title="Dead code estimation"
-              icon={<Skull className="h-4 w-4 text-red-400" />}
+              title="Dead code estimate"
+              icon={<Skull className="h-4 w-4 text-ink-3" />}
               metric={data.dead_code_estimate}
               metricLabel="uncalled symbols"
               emptyText="No likely dead code detected."
@@ -202,10 +190,10 @@ export function AnalyticsPage() {
                   key={`${symbol.file_path}-${symbol.name}`}
                   type="button"
                   onClick={() => openFile(symbol.file_path)}
-                  className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-left text-xs transition-colors hover:border-white/20"
+                  className="flex w-full items-center justify-between rounded-md border border-edge bg-raised px-3 py-2 text-left font-mono text-[11px] transition-colors hover:border-edge-strong"
                 >
-                  <span className="truncate font-mono text-foreground">{symbol.name}</span>
-                  <span className="ml-2 shrink-0 text-muted-foreground">
+                  <span className="truncate text-ink">{symbol.name}</span>
+                  <span className="tnum ml-2 shrink-0 text-ink-3">
                     {symbol.file_path} · {symbol.lines}L
                   </span>
                 </button>
@@ -213,22 +201,14 @@ export function AnalyticsPage() {
             </InsightPanel>
           </div>
 
-          <Card className="border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent">
-            <CardHeader>
-              <CardTitle className="text-base">Complexity heatmap</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ComplexityHeatmap cells={data.heatmap} onSelect={openFile} />
-            </CardContent>
+          <Card className="p-5">
+            <Overline className="mb-4">Complexity heatmap</Overline>
+            <ComplexityHeatmap cells={data.heatmap} onSelect={openFile} />
           </Card>
 
-          <Card className="border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent">
-            <CardHeader>
-              <CardTitle className="text-base">Import dependency graph</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AnalyticsDependencyGraph graph={data.dependency_graph} graphKey={data.job_id} />
-            </CardContent>
+          <Card className="p-5">
+            <Overline className="mb-4">Import dependency graph</Overline>
+            <AnalyticsDependencyGraph graph={data.dependency_graph} graphKey={data.job_id} />
           </Card>
         </motion.div>
       )}
@@ -238,41 +218,39 @@ export function AnalyticsPage() {
 
 function HighlightCard({
   title,
-  icon,
+  tone,
   symbol,
   onOpen,
 }: {
   title: string;
-  icon: React.ReactNode;
+  tone: "gold" | "ember";
   symbol: SymbolRef | null;
   onOpen: (path: string) => void;
 }) {
   return (
-    <Card className="border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent">
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-        {icon}
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card className="p-5">
+      <div className="flex items-center gap-2">
+        <span className={tone === "gold" ? "h-2 w-2 rounded-full bg-gold" : "h-2 w-2 rounded-full bg-ember"} />
+        <Overline>{title}</Overline>
+      </div>
+      <div className="mt-4">
         {symbol ? (
           <button
             type="button"
             onClick={() => onOpen(symbol.file_path)}
-            className="w-full rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-colors hover:border-primary/30"
+            className="w-full rounded-md border border-edge bg-raised p-4 text-left transition-colors hover:border-ember/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <p className="font-mono text-sm text-foreground">{symbol.file_path}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary">{symbol.kind}</Badge>
-              <Badge variant="secondary">{symbol.lines} lines</Badge>
-              {symbol.complexity_score > 0 && (
-                <Badge variant="secondary">score {symbol.complexity_score}</Badge>
-              )}
+            <p className="break-all font-mono text-[13px] text-ink">{symbol.file_path}</p>
+            <div className="tnum mt-3 flex flex-wrap gap-3 font-mono text-[11px] text-ink-3">
+              <span>{symbol.kind}</span>
+              <span>{symbol.lines} lines</span>
+              {symbol.complexity_score > 0 && <span>score {symbol.complexity_score}</span>}
             </div>
           </button>
         ) : (
-          <p className="text-sm text-muted-foreground">Not enough data.</p>
+          <p className="text-sm text-ink-2">Not enough data.</p>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
@@ -293,20 +271,20 @@ function InsightPanel({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           {icon}
-          <CardTitle className="text-base">{title}</CardTitle>
+          <Overline>{title}</Overline>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-semibold">{metric}</p>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{metricLabel}</p>
+          <p className="tnum font-display text-2xl font-semibold leading-none text-ink">{metric}</p>
+          <p className="overline-label mt-1.5">{metricLabel}</p>
         </div>
-      </CardHeader>
-      <CardContent className="max-h-72 space-y-2 overflow-y-auto">
-        {metric === 0 ? <p className="text-sm text-muted-foreground">{emptyText}</p> : children}
-      </CardContent>
+      </div>
+      <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+        {metric === 0 ? <p className="text-sm text-ink-2">{emptyText}</p> : children}
+      </div>
     </Card>
   );
 }

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, KeyRound, Moon, Palette, Save, Settings as SettingsIcon, Trash2, User } from "lucide-react";
+import { Eye, EyeOff, Moon, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Overline } from "@/components/common/Overline";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogClose,
@@ -20,34 +21,26 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useAppStore } from "@/store/appStore";
+import { cn } from "@/utils/cn";
 import { fadeInUp, staggerContainer } from "@/utils/motion";
 
+/* The utility closet — plain stacked sections, hairline-separated. Calm. */
+
 function Section({
-  icon,
-  title,
+  overline,
   description,
   children,
 }: {
-  icon: React.ReactNode;
-  title: string;
+  overline: string;
   description: string;
   children: React.ReactNode;
 }) {
   return (
     <motion.div variants={fadeInUp}>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-primary [&_svg]:size-4">
-              {icon}
-            </div>
-            <div>
-              <CardTitle className="text-base">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>{children}</CardContent>
+      <Card className="p-6">
+        <Overline>{overline}</Overline>
+        <p className="mt-1.5 text-sm text-ink-2">{description}</p>
+        <div className="mt-5">{children}</div>
       </Card>
     </motion.div>
   );
@@ -57,8 +50,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div>
-        <p className="text-sm font-medium">{label}</p>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        <p className="text-sm font-medium text-ink">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-ink-3">{hint}</p>}
       </div>
       {children}
     </div>
@@ -75,23 +68,31 @@ export function SettingsPage() {
   const [apiKey, setApiKey] = useState("sk-••••••••••••••••••••••••");
   const [provider, setProvider] = useState<"openai" | "groq">("groq");
 
-  const saveKeys = () => toast.success("Settings saved", { description: "Your provider configuration was updated." });
+  const saveKeys = () =>
+    toast.success("Settings saved", { description: "Your provider configuration was updated." });
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <PageHeader title="Settings" description="Manage your account, appearance, and integrations." icon={<SettingsIcon />} />
+      <PageHeader
+        overline="Configuration"
+        title="Settings"
+        description="Account, appearance, and integrations."
+      />
 
       <motion.div variants={staggerContainer(0.06)} initial="hidden" animate="show" className="space-y-6">
-        {/* Profile */}
-        <Section icon={<User />} title="Profile" description="How you appear across the workspace.">
+        <Section overline="Profile" description="How you appear across the workspace.">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-sm font-medium" htmlFor="name">Display name</label>
+              <label className="text-sm font-medium text-ink" htmlFor="name">
+                Display name
+              </label>
               <Input id="name" defaultValue="Sajal" className="mt-1.5" />
             </div>
             <div>
-              <label className="text-sm font-medium" htmlFor="email">Email</label>
-              <Input id="email" type="email" defaultValue="sajal@codeintel.dev" className="mt-1.5" />
+              <label className="text-sm font-medium text-ink" htmlFor="email">
+                Email
+              </label>
+              <Input id="email" type="email" defaultValue="sajal@strata.dev" className="mt-1.5" />
             </div>
           </div>
           <div className="mt-4 flex justify-end">
@@ -102,11 +103,10 @@ export function SettingsPage() {
           </div>
         </Section>
 
-        {/* Appearance */}
-        <Section icon={<Palette />} title="Appearance" description="Customize the look and layout of the app.">
-          <Row label="Dark mode" hint="Use the dark, glassmorphic theme.">
+        <Section overline="Appearance" description="The look and layout of the app.">
+          <Row label="Dark theme" hint="Warm graphite strata; light mode is warm paper.">
             <div className="flex items-center gap-2">
-              <Moon className="h-4 w-4 text-muted-foreground" />
+              <Moon className="h-4 w-4 text-ink-3" />
               <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
             </div>
           </Row>
@@ -116,18 +116,17 @@ export function SettingsPage() {
           </Row>
         </Section>
 
-        {/* Providers */}
-        <Section icon={<KeyRound />} title="LLM Provider" description="Connect your model provider for retrieval and generation.">
+        <Section overline="LLM Provider" description="Model provider for retrieval and generation.">
           <Row label="Provider" hint="Used for embeddings and answer generation.">
-            <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+            <div className="flex gap-1 rounded-md border border-edge bg-raised p-1">
               {(["openai", "groq"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setProvider(p)}
-                  className={
-                    "rounded-md px-3 py-1 text-sm capitalize transition-colors " +
-                    (provider === p ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground")
-                  }
+                  className={cn(
+                    "rounded-sm px-3 py-1 font-mono text-[13px] capitalize transition-colors",
+                    provider === p ? "bg-overlay text-ink shadow-stratum" : "text-ink-3 hover:text-ink-2",
+                  )}
                 >
                   {p}
                 </button>
@@ -136,7 +135,9 @@ export function SettingsPage() {
           </Row>
           <Separator />
           <div className="py-3">
-            <label className="text-sm font-medium" htmlFor="key">API key</label>
+            <label className="text-sm font-medium text-ink" htmlFor="key">
+              API key
+            </label>
             <div className="mt-1.5 flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -144,33 +145,32 @@ export function SettingsPage() {
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="pr-10 font-mono"
+                  className="pr-10 font-mono text-[13px]"
                 />
                 <button
                   onClick={() => setShowKey((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 transition-colors hover:text-ink-2"
                   aria-label={showKey ? "Hide key" : "Show key"}
                 >
                   {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <Button variant="gradient" onClick={saveKeys}>
+              <Button onClick={saveKeys}>
                 <Save />
                 Save
               </Button>
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">Keys are encrypted at rest and never logged.</p>
+            <p className="mt-1.5 text-xs text-ink-3">Keys are encrypted at rest and never logged.</p>
           </div>
         </Section>
 
-        {/* Danger zone */}
         <motion.div variants={fadeInUp}>
-          <Card className="border-red-500/20 bg-red-500/[0.03]">
-            <CardHeader>
-              <CardTitle className="text-base text-red-400">Danger zone</CardTitle>
-              <CardDescription>Irreversible actions that affect your entire workspace.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-rust/25 p-6">
+            <Overline className="text-rust">Danger zone</Overline>
+            <p className="mt-1.5 text-sm text-ink-2">
+              Irreversible actions that affect your entire workspace.
+            </p>
+            <div className="mt-5">
               <Row label="Delete all indexed data" hint="Removes every repository, graph, and vector index.">
                 <Dialog>
                   <DialogTrigger asChild>
@@ -194,7 +194,11 @@ export function SettingsPage() {
                       <DialogClose asChild>
                         <Button
                           variant="destructive"
-                          onClick={() => toast.error("All data deleted", { description: "Your workspace has been reset." })}
+                          onClick={() =>
+                            toast.error("All data deleted", {
+                              description: "Your workspace has been reset.",
+                            })
+                          }
                         >
                           <Trash2 />
                           Yes, delete everything
@@ -204,7 +208,7 @@ export function SettingsPage() {
                   </DialogContent>
                 </Dialog>
               </Row>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
       </motion.div>

@@ -38,18 +38,21 @@ export class ErrorBoundary extends Component<Props, State> {
       <div
         role="alert"
         aria-live="assertive"
-        className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/[0.04] px-6 py-12 text-center"
+        className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-edge px-6 py-12 text-center"
       >
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400">
-          <AlertTriangle className="h-7 w-7" aria-hidden />
+        <span className="overline-label mb-5 text-rust">ERR · RUNTIME</span>
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg border border-rust/30 bg-raised text-rust shadow-stratum">
+          <AlertTriangle className="h-6 w-6" aria-hidden />
         </div>
-        <h2 className="text-lg font-semibold">{this.props.fallbackTitle ?? "Something went wrong"}</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">{this.state.message}</p>
+        <h2 className="font-display text-lg font-semibold text-ink">
+          {this.props.fallbackTitle ?? "Something went wrong"}
+        </h2>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-2">{this.state.message}</p>
         <div className="mt-6 flex gap-2">
           <Button variant="secondary" onClick={this.reset}>
             Try again
           </Button>
-          <Button variant="outline" onClick={() => window.location.reload()}>
+          <Button variant="ghost" onClick={() => window.location.reload()}>
             <RefreshCw />
             Reload page
           </Button>

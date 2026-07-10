@@ -16,7 +16,7 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 overflow-hidden rounded-md border border-white/10 bg-[hsl(240_10%_8%)] px-2.5 py-1.5 text-xs text-foreground shadow-xl",
+        "z-50 overflow-hidden rounded-sm border border-edge bg-overlay px-2.5 py-1.5 text-xs text-ink shadow-overlay",
         "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
         className,
       )}

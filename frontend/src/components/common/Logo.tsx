@@ -9,20 +9,29 @@ interface LogoProps {
   to?: string;
 }
 
-/** Brand mark: a gradient glyph plus optional wordmark. */
+/**
+ * Brand mark: three strata — layers of rock, the top one glowing ember.
+ * A codebase is a geological object; we excavate it.
+ */
+function Glyph() {
+  return (
+    <div className="relative flex h-8 w-8 items-center justify-center rounded-md border border-edge bg-raised shadow-stratum">
+      <svg viewBox="0 0 20 20" style={{ width: 18, height: 18 }} aria-hidden>
+        <rect x="3" y="4" width="14" height="3" rx="1.5" fill="hsl(var(--ember))" />
+        <rect x="3" y="9" width="14" height="3" rx="1.5" fill="hsl(var(--text-2))" opacity="0.7" />
+        <rect x="3" y="14" width="14" height="3" rx="1.5" fill="hsl(var(--text-3))" opacity="0.55" />
+      </svg>
+    </div>
+  );
+}
+
 export function Logo({ className, showWordmark = true, to }: LogoProps) {
   const content = (
     <>
-      <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 shadow-glow">
-        <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 6h16M4 12h10M4 18h7" />
-          <circle cx="18" cy="15" r="3" />
-          <path d="m20.5 17.5 2 2" />
-        </svg>
-      </div>
+      <Glyph />
       {showWordmark && (
-        <span className="text-sm font-semibold tracking-tight">
-          Code<span className="text-muted-foreground">Intel</span>
+        <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
+          Strata
         </span>
       )}
     </>
@@ -32,8 +41,8 @@ export function Logo({ className, showWordmark = true, to }: LogoProps) {
     return (
       <Link
         to={to}
-        className={cn("flex items-center gap-2.5 transition-opacity hover:opacity-90", className)}
-        aria-label="CodeIntel home"
+        className={cn("flex items-center gap-2.5 transition-opacity hover:opacity-85", className)}
+        aria-label="Strata home"
       >
         {content}
       </Link>

@@ -1,6 +1,7 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { BlueprintCorners } from "@/components/common/BlueprintCorners";
 import { Button } from "@/components/ui/button";
 import { scaleIn } from "@/utils/motion";
 
@@ -10,7 +11,7 @@ interface ErrorStateProps {
   onRetry?: () => void;
 }
 
-/** Standard error surface with a retry affordance. */
+/** Error surface — a displaced stratum. Rust appears as accent, not fill. */
 export function ErrorState({
   title = "Something went wrong",
   description = "We couldn't load this data. Please try again.",
@@ -21,13 +22,15 @@ export function ErrorState({
       variants={scaleIn}
       initial="hidden"
       animate="show"
-      className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/[0.04] px-6 py-16 text-center"
+      className="relative flex flex-col items-center justify-center rounded-lg border border-dashed border-edge px-6 py-16 text-center"
     >
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400 [&_svg]:size-7">
+      <BlueprintCorners />
+      <span className="overline-label mb-5 text-rust">ERR · LOAD FAILED</span>
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg border border-rust/30 bg-raised text-rust shadow-stratum [&_svg]:size-6">
         <AlertTriangle />
       </div>
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>
+      <h3 className="font-display text-lg font-semibold text-ink">{title}</h3>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-ink-2">{description}</p>
       {onRetry && (
         <Button variant="secondary" className="mt-6" onClick={onRetry}>
           <RefreshCw />

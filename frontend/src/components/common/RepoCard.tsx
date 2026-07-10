@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { toApiErrorMessage } from "@/api/client";
-import { Card } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/ui/card";
 import { RepoStatusBadge } from "@/components/common/RepoStatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,15 +27,18 @@ import {
 import { useRepoStore } from "@/store/repoStore";
 import type { Repository } from "@/types";
 import { formatCompact } from "@/utils/format";
-import { fadeInUp } from "@/utils/motion";
+import { fadeInUp, settle } from "@/utils/motion";
 import { removeRepositoriesFromBackend } from "@/utils/repositoryCleanup";
 import { cn } from "@/utils/cn";
 
+/* Language dots — earthy, luminance-separated (see chartTheme). */
 const LANGUAGE_COLOR: Record<string, string> = {
-  TypeScript: "bg-sky-400",
-  Python: "bg-amber-400",
-  Rust: "bg-orange-400",
-  Go: "bg-cyan-400",
+  TypeScript: "bg-[hsl(215_14%_58%)]",
+  JavaScript: "bg-gold",
+  Python: "bg-moss",
+  Rust: "bg-ember",
+  Go: "bg-[hsl(150_26%_50%)]",
+  Java: "bg-[hsl(10_42%_52%)]",
 };
 
 interface RepoCardProps {
@@ -93,17 +96,20 @@ export function RepoCard({
     }
   };
 
+  const isLive = repo.status === "indexing";
+
   return (
     <>
-      <motion.div variants={fadeInUp}>
-        <Card
+      <motion.div variants={fadeInUp} className="h-full">
+        <SpotlightCard
           onClick={handleCardClick}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
           className={cn(
-            "group relative flex h-full cursor-pointer flex-col overflow-hidden p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-glow",
-            selectionMode && selected && "border-primary/50 ring-1 ring-primary/40",
+            "flex h-full cursor-pointer flex-col p-5",
+            selectionMode && selected && "border-ember/50 ring-1 ring-ember/40",
+            isLive && "border-ember/25",
           )}
         >
           {selectionMode && (
@@ -111,25 +117,26 @@ export function RepoCard({
               type="button"
               aria-label={selected ? "Deselect repository" : "Select repository"}
               className={cn(
-                "absolute left-3 top-3 z-10 flex h-5 w-5 items-center justify-center rounded border transition-colors",
+                "absolute left-3.5 top-3.5 z-10 flex h-5 w-5 items-center justify-center rounded-sm border transition-colors",
                 selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-white/20 bg-black/40 text-transparent hover:border-white/40",
+                  ? "border-ember bg-ember text-on-ember"
+                  : "border-edge-strong bg-raised text-transparent hover:border-ink-3",
               )}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSelect?.(repo.id);
               }}
             >
-              <Check className="h-3.5 w-3.5" />
+              <Check className="h-3.5 w-3.5" strokeWidth={3} />
             </button>
           )}
 
-          <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
           <div className={cn("flex items-start justify-between gap-3", selectionMode && "pl-7")}>
             <div className="min-w-0">
-              <p className="truncate text-xs text-muted-foreground">{repo.owner}/</p>
-              <h3 className="truncate text-base font-semibold group-hover:text-primary">{repo.name}</h3>
+              <p className="truncate font-mono text-[11px] text-ink-3">{repo.owner}/</p>
+              <h3 className="mt-0.5 truncate font-display text-[17px] font-semibold text-ink">
+                {repo.name}
+              </h3>
             </div>
             <div className="flex items-center gap-1">
               <RepoStatusBadge status={repo.status} />
@@ -139,8 +146,8 @@ export function RepoCard({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 opacity-60 transition-opacity hover:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                      size="icon-sm"
+                      className="shrink-0 opacity-50 transition-opacity hover:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                       aria-label={`Actions for ${repo.name}`}
@@ -159,7 +166,7 @@ export function RepoCard({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="text-red-400 focus:text-red-300"
+                      className="text-rust focus:text-rust"
                       onSelect={(e) => {
                         e.preventDefault();
                         setConfirmOpen(true);
@@ -174,41 +181,43 @@ export function RepoCard({
             </div>
           </div>
 
-          <p className="mt-2 line-clamp-2 flex-1 text-sm text-muted-foreground">{repo.description}</p>
+          <p className="mt-2.5 line-clamp-2 flex-1 text-sm leading-relaxed text-ink-2">
+            {repo.description}
+          </p>
 
-          {repo.status === "indexing" && (
+          {isLive && (
             <div className="mt-4">
-              <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                <span>Indexing…</span>
-                <span>{repo.progress}%</span>
+              <div className="mb-1.5 flex justify-between font-mono text-[11px]">
+                <span className="animate-breathe text-ember">INDEXING</span>
+                <span className="tnum text-ink-2">{repo.progress}%</span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-1 overflow-hidden rounded-full bg-raised">
                 <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400"
+                  className="h-full rounded-full bg-ember"
                   initial={{ width: 0 }}
                   animate={{ width: `${repo.progress}%` }}
-                  transition={{ ease: "easeOut" }}
+                  transition={settle}
                 />
               </div>
             </div>
           )}
 
-          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="mt-4 flex items-center gap-4 border-t border-edge pt-3.5 font-mono text-[11px] text-ink-3">
             <span className="inline-flex items-center gap-1.5">
-              <span className={`h-2.5 w-2.5 rounded-full ${LANGUAGE_COLOR[repo.language] ?? "bg-white/40"}`} />
+              <span className={cn("h-2 w-2 rounded-full", LANGUAGE_COLOR[repo.language] ?? "bg-ink-3/60")} />
               {repo.language}
             </span>
-            <span className="inline-flex items-center gap-1">
-              <Star className="h-3.5 w-3.5" />
+            <span className="tnum inline-flex items-center gap-1">
+              <Star className="h-3 w-3" />
               {formatCompact(repo.stars)}
             </span>
-            <span className="inline-flex items-center gap-1">
-              <GitFork className="h-3.5 w-3.5" />
+            <span className="tnum inline-flex items-center gap-1">
+              <GitFork className="h-3 w-3" />
               {formatCompact(repo.forks)}
             </span>
             <span className="ml-auto">{repo.updatedAt}</span>
           </div>
-        </Card>
+        </SpotlightCard>
       </motion.div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -216,8 +225,12 @@ export function RepoCard({
           <DialogHeader>
             <DialogTitle>Remove repository?</DialogTitle>
             <DialogDescription>
-              This permanently deletes <strong>{repo.owner}/{repo.name}</strong> from your
-              workspace, including parse data, embeddings, and graph indexes. This cannot be undone.
+              This permanently deletes{" "}
+              <strong className="text-ink">
+                {repo.owner}/{repo.name}
+              </strong>{" "}
+              from your workspace, including parse data, embeddings, and graph indexes. This cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

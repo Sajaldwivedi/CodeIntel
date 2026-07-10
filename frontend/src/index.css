@@ -2,49 +2,100 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens only. All component styling is done with Tailwind utilities.
-   Dark-first: the default `:root` palette is the dark theme; `.light` opts out. */
+/* ─────────────────────────────────────────────────────────────────────────
+   STRATA design tokens.
+
+   The metaphor: a codebase is a geological object — layers of warm rock.
+   Depth is luminance (deeper = darker). Light comes from above (top
+   highlights on raised surfaces). Heat (the ember accent) marks whatever
+   the system is doing *right now*.
+
+   Dark is the default; `.light` is warm paper. Hue stays warm (20–40°)
+   everywhere — never blue-gray.
+   ──────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 5.5%;
-    --card-foreground: 0 0% 98%;
-    --primary: 263 90% 63%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 14%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 13%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 190 95% 55%;
-    --accent-foreground: 240 10% 4%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 18%;
-    --input: 240 6% 18%;
-    --ring: 263 90% 63%;
-    --radius: 0.75rem;
+    /* Strata (back → front) */
+    --background: 20 14% 4.2%;
+    --surface: 22 12% 6.8%;
+    --raised: 24 10% 9.5%;
+    --overlay: 24 10% 12%;
+
+    /* Hairlines */
+    --border: 26 10% 15.5%;
+    --border-strong: 26 12% 22%;
+    --input: 26 10% 15.5%;
+
+    /* Ink */
+    --foreground: 36 20% 93%;
+    --text-2: 30 8% 64%;
+    --text-3: 28 6% 45%;
+
+    /* Ember — the single accent. Text on ember is dark ink, not white. */
+    --ember: 24 92% 58%;
+    --ember-bright: 28 96% 66%;
+    --on-ember: 20 50% 7%;
+
+    /* Status */
+    --moss: 150 30% 52%;
+    --gold: 44 85% 58%;
+    --rust: 8 68% 56%;
+
+    /* shadcn compatibility aliases */
+    --card: var(--surface);
+    --card-foreground: var(--foreground);
+    --primary: var(--ember);
+    --primary-foreground: var(--on-ember);
+    --secondary: var(--raised);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--raised);
+    --muted-foreground: var(--text-2);
+    --accent: var(--ember);
+    --accent-foreground: var(--on-ember);
+    --destructive: var(--rust);
+    --destructive-foreground: 36 20% 93%;
+    --ring: 24 92% 58%;
+    --radius: 0.875rem;
+
     color-scheme: dark;
   }
 
   .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --primary: 263 80% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 190 90% 42%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 263 80% 55%;
+    --background: 40 30% 96.5%;
+    --surface: 0 0% 100%;
+    --raised: 40 25% 94%;
+    --overlay: 0 0% 100%;
+
+    --border: 30 12% 87%;
+    --border-strong: 28 12% 78%;
+    --input: 30 12% 87%;
+
+    --foreground: 24 20% 10%;
+    --text-2: 26 8% 40%;
+    --text-3: 26 6% 56%;
+
+    --ember: 22 88% 47%;
+    --ember-bright: 24 90% 54%;
+    --on-ember: 40 40% 98%;
+
+    --moss: 150 35% 36%;
+    --gold: 40 80% 40%;
+    --rust: 8 65% 46%;
+
+    --card: var(--surface);
+    --card-foreground: var(--foreground);
+    --primary: var(--ember);
+    --primary-foreground: var(--on-ember);
+    --secondary: var(--raised);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--raised);
+    --muted-foreground: var(--text-2);
+    --accent: var(--ember);
+    --accent-foreground: var(--on-ember);
+    --destructive: var(--rust);
+    --destructive-foreground: 40 40% 98%;
+    --ring: 22 88% 47%;
+
     color-scheme: light;
   }
 }
@@ -57,10 +108,21 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-bedrock text-ink antialiased;
+    font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
   }
-  /* Refined scrollbars to match the premium aesthetic. */
+
+  /* Numbers never wobble while streaming/counting. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: hsl(var(--ember) / 0.28);
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -69,16 +131,19 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-white/10;
-    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: hsl(var(--border-strong));
+    border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    background: hsl(var(--text-3));
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-bedrock;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -90,5 +155,96 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+@layer components {
+  /* Signature: mono overline label — the engineer's blueprint annotation. */
+  .overline-label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: hsl(var(--text-3));
+  }
+
+  /* Stratum 1 surface: fill + hairline + top highlight (light from above). */
+  .stratum {
+    background-color: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    box-shadow:
+      inset 0 1px 0 hsl(36 20% 93% / 0.04),
+      0 1px 2px hsl(0 0% 0% / 0.4);
+  }
+  .light .stratum {
+    box-shadow: 0 1px 2px hsl(24 20% 10% / 0.06);
+  }
+
+  /* Ember spotlight host — set --spot-x/--spot-y in px from JS. */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--spot-opacity, 0);
+    transition: opacity 0.35s ease;
+    background: radial-gradient(
+      320px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      hsl(var(--ember) / 0.07),
+      transparent 70%
+    );
+  }
+
+  /* Prose defaults for chat / markdown without @tailwindcss/typography. */
+  .strata-prose {
+    @apply text-[15px] leading-[1.7] text-ink;
+  }
+  .strata-prose p {
+    @apply my-3 first:mt-0 last:mb-0;
+  }
+  .strata-prose ul {
+    @apply my-3 list-disc space-y-1.5 pl-5;
+  }
+  .strata-prose ol {
+    @apply my-3 list-decimal space-y-1.5 pl-5;
+  }
+  .strata-prose h1,
+  .strata-prose h2,
+  .strata-prose h3,
+  .strata-prose h4 {
+    @apply mb-2 mt-5 font-semibold text-ink first:mt-0;
+  }
+  .strata-prose h1 {
+    @apply text-lg;
+  }
+  .strata-prose h2 {
+    @apply text-base;
+  }
+  .strata-prose h3,
+  .strata-prose h4 {
+    @apply text-[15px];
+  }
+  .strata-prose a {
+    @apply text-ember underline decoration-ember/40 underline-offset-2 hover:decoration-ember;
+  }
+  .strata-prose blockquote {
+    @apply my-3 border-l-2 border-ember/50 pl-4 text-ink-2;
+  }
+  .strata-prose table {
+    @apply my-3 w-full border-collapse text-sm;
+  }
+  .strata-prose th {
+    @apply border-b border-edge-strong px-3 py-1.5 text-left font-medium;
+  }
+  .strata-prose td {
+    @apply border-b border-edge px-3 py-1.5;
+  }
+  .strata-prose hr {
+    @apply my-5 border-edge;
+  }
+  .strata-prose strong {
+    @apply font-semibold text-ink;
   }
 }

@@ -4,11 +4,6 @@ import type { Edge, Node } from "@xyflow/react";
 import { InteractiveGraph } from "@/components/diagrams/InteractiveGraph";
 import type { DependencyGraph } from "@/types/analytics";
 
-const GROUP_COLORS: Record<string, string> = {
-  internal: "from-violet-500/30 to-cyan-400/20",
-  external: "from-amber-500/30 to-orange-400/20",
-};
-
 function layoutNodes(nodes: DependencyGraph["nodes"]): Node[] {
   const cols = Math.ceil(Math.sqrt(nodes.length));
   return nodes.map((node, index) => ({
@@ -21,6 +16,7 @@ function layoutNodes(nodes: DependencyGraph["nodes"]): Node[] {
       group: node.group,
       description: node.path,
       file_path: node.path,
+      color: node.group === "external" ? "hsl(44 85% 58%)" : "hsl(24 92% 58%)",
     },
     style: {
       width: 180,
@@ -38,25 +34,26 @@ export function AnalyticsDependencyGraph({ graph, graphKey }: { graph: Dependenc
         target: edge.target,
         label: edge.label,
         animated: true,
-        style: { stroke: "rgba(139,92,246,0.45)" },
+        style: { stroke: "hsl(26 12% 26%)" },
       })),
     [graph.edges],
   );
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full border border-white/10 px-2.5 py-1">
-          Max import depth: <strong className="text-foreground">{graph.max_depth}</strong>
+      <div className="mb-3 flex flex-wrap gap-2 font-mono text-[11px] text-ink-2">
+        <span className="rounded-full border border-edge bg-raised px-2.5 py-1">
+          max depth <strong className="tnum text-ink">{graph.max_depth}</strong>
         </span>
-        <span className="rounded-full border border-white/10 px-2.5 py-1">
-          Nodes: <strong className="text-foreground">{graph.nodes.length}</strong>
+        <span className="rounded-full border border-edge bg-raised px-2.5 py-1">
+          nodes <strong className="tnum text-ink">{graph.nodes.length}</strong>
         </span>
-        {Object.entries(GROUP_COLORS).map(([group]) => (
-          <span key={group} className="rounded-full border border-white/10 px-2.5 py-1 capitalize">
-            {group}
-          </span>
-        ))}
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-raised px-2.5 py-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-ember" /> internal
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-raised px-2.5 py-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold" /> external
+        </span>
       </div>
       <InteractiveGraph
         graphKey={graphKey}

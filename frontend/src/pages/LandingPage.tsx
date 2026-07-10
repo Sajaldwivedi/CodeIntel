@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   Boxes,
@@ -7,198 +8,272 @@ import {
   Network,
   ScanSearch,
   ShieldCheck,
-  Sparkles,
   Workflow,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { AuroraBackground } from "@/components/common/AuroraBackground";
+import { AmbientBackground } from "@/components/common/AmbientBackground";
+import { BlueprintCorners } from "@/components/common/BlueprintCorners";
 import { Logo } from "@/components/common/Logo";
-import { Badge } from "@/components/ui/badge";
+import { Overline } from "@/components/common/Overline";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, SpotlightCard } from "@/components/ui/card";
+import { cn } from "@/utils/cn";
 import { fadeInUp, staggerContainer } from "@/utils/motion";
 
 const features = [
-  { icon: ScanSearch, title: "Deep code understanding", desc: "Tree-sitter parsing extracts symbols, calls, and structure across every language in the repo." },
-  { icon: Network, title: "Graph + Vector retrieval", desc: "Hybrid search fuses a Neo4j knowledge graph with ChromaDB embeddings for grounded answers." },
-  { icon: MessagesSquare, title: "Answers with citations", desc: "Every response links back to exact files and line ranges — no hallucinated APIs." },
-  { icon: Workflow, title: "Architecture diagrams", desc: "Auto-generated system maps reveal how services, modules, and data stores connect." },
-  { icon: Boxes, title: "Dependency analysis", desc: "Visualize coupling and blast-radius before you ship a breaking change." },
-  { icon: ShieldCheck, title: "Production-grade", desc: "Typed, modular, and containerized — built to scale as a real SaaS product." },
+  {
+    icon: ScanSearch,
+    title: "Deep code understanding",
+    desc: "Tree-sitter parsing extracts symbols, calls, and structure across every language in the repository.",
+  },
+  {
+    icon: Network,
+    title: "Graph + vector retrieval",
+    desc: "Hybrid search fuses a Neo4j knowledge graph with ChromaDB embeddings for grounded answers.",
+  },
+  {
+    icon: MessagesSquare,
+    title: "Answers with citations",
+    desc: "Every response links back to exact files and line ranges — no hallucinated APIs.",
+  },
+  {
+    icon: Workflow,
+    title: "Architecture diagrams",
+    desc: "Auto-generated system maps reveal how services, modules, and data stores connect.",
+  },
+  {
+    icon: Boxes,
+    title: "Dependency analysis",
+    desc: "Visualize coupling and blast radius before you ship a breaking change.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Production-grade",
+    desc: "Typed, modular, and containerized — built to scale like a real SaaS product.",
+  },
 ];
 
 const stats = [
   { value: "40+", label: "Languages parsed" },
   { value: "12ms", label: "Median retrieval" },
   { value: "99.9%", label: "Citation accuracy" },
-  { value: "∞", label: "Repos, one graph" },
+  { value: "6", label: "Pipeline stages" },
 ];
+
+/* The excavation — a repository being taken apart, layer by layer. */
+const EXCAVATION_LINES = [
+  { text: "$ strata index github.com/acme/checkout", tone: "cmd" },
+  { text: "clone      842 files · 214,708 lines", tone: "dim" },
+  { text: "parse      6,214 symbols extracted", tone: "dim" },
+  { text: "graph      18,455 relationships mapped", tone: "dim" },
+  { text: "embed      12,038 chunks indexed", tone: "dim" },
+  { text: "ready — ask anything", tone: "ember" },
+] as const;
+
+function ExcavationPanel() {
+  const reduceMotion = useReducedMotion();
+  const [visible, setVisible] = useState(reduceMotion ? EXCAVATION_LINES.length : 0);
+  const [showAnswer, setShowAnswer] = useState(!!reduceMotion);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    if (visible < EXCAVATION_LINES.length) {
+      const t = setTimeout(() => setVisible((v) => v + 1), visible === 0 ? 500 : 550);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setShowAnswer(true), 600);
+    return () => clearTimeout(t);
+  }, [visible, reduceMotion]);
+
+  return (
+    <Card className="relative overflow-hidden p-0 text-left">
+      <BlueprintCorners />
+      <div className="flex items-center gap-2 border-b border-edge px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-raised" />
+        <span className="h-2.5 w-2.5 rounded-full bg-raised" />
+        <span className="h-2.5 w-2.5 rounded-full bg-raised" />
+        <span className="ml-2 font-mono text-[11px] text-ink-3">strata — indexing</span>
+      </div>
+      <div className="min-h-[178px] space-y-1.5 px-5 py-4 font-mono text-[13px] leading-relaxed">
+        {EXCAVATION_LINES.slice(0, visible).map((line) => (
+          <motion.p
+            key={line.text}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+              line.tone === "cmd" && "text-ink",
+              line.tone === "dim" && "text-ink-3",
+              line.tone === "ember" && "text-ember",
+            )}
+          >
+            {line.text}
+          </motion.p>
+        ))}
+        {!showAnswer && visible < EXCAVATION_LINES.length && (
+          <span className="inline-block h-4 w-[7px] animate-caret-blink bg-ember align-middle" aria-hidden />
+        )}
+      </div>
+      {showAnswer && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-t border-edge bg-raised/50 px-5 py-4"
+        >
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Question</p>
+          <p className="mt-1 text-sm text-ink">How does the app handle authentication?</p>
+          <p className="mt-3 text-sm leading-relaxed text-ink-2">
+            Auth is enforced by a session middleware that validates a signed cookie on every
+            request…{" "}
+            <span className="rounded-sm border border-ember/30 bg-ember/10 px-1.5 py-0.5 font-mono text-xs text-ember">
+              auth.py:18–34
+            </span>
+          </p>
+        </motion.div>
+      )}
+    </Card>
+  );
+}
 
 export function LandingPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <AuroraBackground />
+    <div className="relative min-h-screen overflow-hidden bg-bedrock">
+      <AmbientBackground />
 
       {/* Nav */}
-      <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Logo to="/" />
-        <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-          <a href="#features" className="transition-colors hover:text-foreground">Features</a>
-          <a href="#stats" className="transition-colors hover:text-foreground">Platform</a>
-          <a href="#" className="transition-colors hover:text-foreground">Docs</a>
+        <nav className="hidden items-center gap-8 text-sm text-ink-2 md:flex">
+          <a href="#features" className="transition-colors hover:text-ink">
+            Features
+          </a>
+          <a href="#platform" className="transition-colors hover:text-ink">
+            Platform
+          </a>
         </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="gradient" size="sm" asChild>
-            <Link to="/dashboard">Launch app</Link>
-          </Button>
-        </div>
+        <Button size="sm" asChild>
+          <Link to="/dashboard">Launch app</Link>
+        </Button>
       </header>
 
-      {/* Hero */}
-      <section className="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center md:pt-24">
-        <motion.div variants={staggerContainer(0.08)} initial="hidden" animate="show">
-          <motion.div variants={fadeInUp} className="mb-6 flex justify-center">
-            <Badge variant="outline" className="gap-2 border-white/15 bg-white/5 py-1 pl-1.5 pr-3">
-              <span className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 px-2 py-0.5 text-[10px] font-semibold text-white">
-                NEW
-              </span>
-              Graph-RAG code intelligence
-            </Badge>
+      {/* Hero — editorial, left-aligned, annotated. */}
+      <section className="mx-auto grid max-w-6xl items-center gap-14 px-6 pb-28 pt-16 md:pt-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <motion.div variants={staggerContainer(0.07)} initial="hidden" animate="show">
+          <motion.div variants={fadeInUp}>
+            <Overline>AI Software Engineer · For GitHub Repositories</Overline>
           </motion.div>
 
           <motion.h1
             variants={fadeInUp}
-            className="text-balance text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl"
+            className="mt-5 font-display text-[44px] font-semibold leading-[1.05] tracking-[-0.02em] text-ink sm:text-6xl lg:text-[64px]"
           >
-            The AI software engineer for{" "}
-            <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-300 bg-clip-text text-transparent">
-              your codebase
-            </span>
+            Understand any codebase,
+            <br />
+            <span className="text-ember">layer by layer.</span>
           </motion.h1>
 
-          <motion.p
-            variants={fadeInUp}
-            className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground"
-          >
-            Point it at any GitHub repository. Get instant, cited answers, living architecture
-            diagrams, and dependency insight — powered by a hybrid knowledge graph and vector search.
+          <motion.p variants={fadeInUp} className="mt-6 max-w-lg text-base leading-[1.65] text-ink-2">
+            Point Strata at a repository. It excavates the structure — symbols, call graphs,
+            dependencies — and answers your questions with citations to exact files and lines.
           </motion.p>
 
-          <motion.div variants={fadeInUp} className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button variant="gradient" size="lg" asChild>
+          <motion.div variants={fadeInUp} className="mt-10 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <Button size="lg" asChild>
               <Link to="/upload">
-                <Sparkles />
                 Analyze a repository
-              </Link>
-            </Button>
-            <Button variant="secondary" size="lg" asChild>
-              <Link to="/dashboard">
-                Open dashboard
                 <ArrowRight />
               </Link>
             </Button>
+            <Button variant="ghost" size="lg" asChild>
+              <Link to="/dashboard">Open dashboard</Link>
+            </Button>
           </motion.div>
+
+          <motion.p variants={fadeInUp} className="mt-8 font-mono text-[11px] tracking-[0.14em] text-ink-3">
+            READ-ONLY ACCESS · NO SETUP · CITED ANSWERS
+          </motion.p>
         </motion.div>
 
-        {/* Floating preview card */}
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto mt-16 max-w-3xl"
+          transition={{ delay: 0.25, type: "spring", stiffness: 200, damping: 26 }}
         >
-          <Card className="overflow-hidden p-1.5 shadow-glow-lg">
-            <div className="rounded-lg border border-white/10 bg-[hsl(240_10%_4%)] p-4 text-left font-mono text-sm">
-              <div className="mb-3 flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-full bg-red-400/70" />
-                <span className="h-3 w-3 rounded-full bg-amber-400/70" />
-                <span className="h-3 w-3 rounded-full bg-emerald-400/70" />
-              </div>
-              <p className="text-muted-foreground">
-                <span className="text-violet-400">?</span> How does the app handle authentication?
-              </p>
-              <p className="mt-2 text-foreground/90">
-                Auth is enforced by a session middleware validating a signed cookie…{" "}
-                <span className="rounded bg-primary/15 px-1 text-primary">auth.py:18-34</span>
-              </p>
-            </div>
-          </Card>
+          <ExcavationPanel />
         </motion.div>
       </section>
 
-      {/* Stats */}
-      <section id="stats" className="mx-auto max-w-5xl px-6 py-10">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {/* Stats — a single hairline strip, mono numerals. */}
+      <section id="platform" className="border-y border-edge">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 divide-edge px-6 sm:grid-cols-4 sm:divide-x">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-center">
-              <div className="bg-gradient-to-r from-violet-400 to-cyan-300 bg-clip-text text-3xl font-bold text-transparent">
+            <div key={s.label} className="py-8 text-center sm:px-6">
+              <div className="tnum font-display text-3xl font-semibold tracking-tight text-ink">
                 {s.value}
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
+              <div className="overline-label mt-2">{s.label}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="mx-auto max-w-7xl px-6 py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-            Everything you need to understand code
+      <section id="features" className="mx-auto max-w-6xl px-6 py-28">
+        <div className="max-w-2xl">
+          <Overline>Capabilities</Overline>
+          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink md:text-4xl">
+            A complete intelligence layer over your repositories
           </h2>
-          <p className="mt-3 text-muted-foreground">
-            A complete intelligence layer over your repositories — not just chat.
+          <p className="mt-3 leading-relaxed text-ink-2">
+            Not just chat — parsing, graphs, analytics, and living diagrams under one roof.
           </p>
         </div>
 
         <motion.div
-          variants={staggerContainer(0.06)}
+          variants={staggerContainer(0.05)}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-80px" }}
-          className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           {features.map((f) => (
-            <motion.div key={f.title} variants={fadeInUp}>
-              <Card className="group h-full p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.05]">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-400/20 text-primary transition-transform duration-300 group-hover:scale-110 [&_svg]:size-5">
-                  <f.icon />
-                </div>
-                <h3 className="mt-4 font-semibold">{f.title}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
-              </Card>
+            <motion.div key={f.title} variants={fadeInUp} className="h-full">
+              <SpotlightCard className="h-full p-6">
+                <f.icon className="h-5 w-5 text-ember" />
+                <h3 className="mt-4 font-semibold text-ink">{f.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{f.desc}</p>
+              </SpotlightCard>
             </motion.div>
           ))}
         </motion.div>
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-5xl px-6 pb-24">
+      <section className="mx-auto max-w-6xl px-6 pb-28">
         <Card className="relative overflow-hidden p-10 text-center md:p-16">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-600/20 via-transparent to-cyan-400/20" />
-          <div className="relative">
-            <GitBranch className="mx-auto h-10 w-10 text-primary" />
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-              Ship with a map of your codebase
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Connect a repository and get answers in seconds. No setup, no config.
-            </p>
-            <Button variant="gradient" size="lg" className="mt-8" asChild>
-              <Link to="/upload">
-                Get started free
-                <ArrowRight />
-              </Link>
-            </Button>
-          </div>
+          <BlueprintCorners />
+          <GitBranch className="mx-auto h-8 w-8 text-ember" />
+          <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-ink md:text-4xl">
+            Ship with a map of your codebase
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl leading-relaxed text-ink-2">
+            Connect a repository and get answers in seconds. No setup, no config.
+          </p>
+          <Button size="lg" className="mt-8" asChild>
+            <Link to="/upload">
+              Get started
+              <ArrowRight />
+            </Link>
+          </Button>
         </Card>
       </section>
 
-      <footer className="border-t border-white/10 py-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
+      <footer className="border-t border-edge py-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-ink-3 sm:flex-row">
           <Logo to="/" />
-          <p>© {new Date().getFullYear()} CodeIntel. Built for engineers.</p>
+          <p className="font-mono text-[11px] tracking-[0.14em]">
+            © {new Date().getFullYear()} STRATA · BUILT FOR ENGINEERS
+          </p>
         </div>
       </footer>
     </div>

@@ -3,9 +3,8 @@ import { Check, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-import { Button } from "@/components/ui/button";
+import { strataCodeTheme } from "@/components/chat/codeTheme";
 import { cn } from "@/utils/cn";
 import type { Citation } from "@/types";
 
@@ -18,13 +17,8 @@ interface MarkdownMessageProps {
   className?: string;
 }
 
-function CodeBlock({
-  language,
-  value,
-}: {
-  language: string | undefined;
-  value: string;
-}) {
+/** Code block: stratum 2 with a title bar — traffic dots, mono language tag, copy. */
+function CodeBlock({ language, value }: { language: string | undefined; value: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(async () => {
@@ -34,30 +28,33 @@ function CodeBlock({
   }, [value]);
 
   return (
-    <div className="group relative my-3 overflow-hidden rounded-lg border border-white/10">
-      <div className="flex items-center justify-between border-b border-white/10 bg-black/40 px-3 py-1.5">
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          {language || "text"}
-        </span>
-        <Button
+    <div className="group relative my-4 overflow-hidden rounded-md border border-edge bg-raised shadow-stratum">
+      <div className="flex items-center justify-between border-b border-edge px-3.5 py-2">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-edge-strong" />
+          <span className="h-2 w-2 rounded-full bg-edge-strong" />
+          <span className="h-2 w-2 rounded-full bg-edge-strong" />
+          <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+            {language || "text"}
+          </span>
+        </div>
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-2 text-xs opacity-80 hover:opacity-100"
           onClick={copy}
+          className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 font-mono text-[11px] text-ink-3 transition-colors hover:bg-overlay hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3 w-3 text-moss" /> : <Copy className="h-3 w-3" />}
           {copied ? "Copied" : "Copy"}
-        </Button>
+        </button>
       </div>
       <SyntaxHighlighter
         language={language || "text"}
-        style={oneDark}
+        style={strataCodeTheme}
         customStyle={{
           margin: 0,
           padding: "0.875rem 1rem",
-          background: "rgba(0,0,0,0.35)",
-          fontSize: "0.75rem",
+          background: "transparent",
+          fontSize: "13px",
         }}
         PreTag="div"
       >
@@ -99,7 +96,7 @@ function linkifyPath(
           key={`${normalized}-${start}`}
           type="button"
           onClick={() => onFileClick(normalized, line)}
-          className="font-mono text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+          className="font-mono text-[0.92em] text-ember underline decoration-ember/40 underline-offset-2 hover:decoration-ember"
         >
           {openTick}
           {path}
@@ -125,13 +122,10 @@ export function MarkdownMessage({
   onFileClick,
   className,
 }: MarkdownMessageProps) {
-  const knownPaths = new Set<string>([
-    ...fileReferences,
-    ...citations.map((c) => c.path),
-  ]);
+  const knownPaths = new Set<string>([...fileReferences, ...citations.map((c) => c.path)]);
 
   return (
-    <div className={cn("prose prose-invert prose-sm max-w-none", className)}>
+    <div className={cn("strata-prose max-w-none", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -156,12 +150,12 @@ export function MarkdownMessage({
               const raw = value.replace(/`/g, "");
               const isFile = [...knownPaths].some((p) => p.includes(raw) || raw.includes(p));
               const isFn = functionReferences.includes(raw);
-              if ((isFile || isFn) && onFileClick && isFile) {
+              if (isFile && onFileClick) {
                 return (
                   <button
                     type="button"
                     onClick={() => onFileClick(raw)}
-                    className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-xs text-primary hover:bg-primary/25"
+                    className="rounded-sm border border-ember/30 bg-ember/10 px-1.5 py-0.5 font-mono text-xs text-ember transition-colors hover:bg-ember/20"
                   >
                     {value}
                   </button>
@@ -169,13 +163,16 @@ export function MarkdownMessage({
               }
               if (isFn) {
                 return (
-                  <code className="rounded bg-violet-500/15 px-1.5 py-0.5 font-mono text-xs text-violet-300">
+                  <code className="rounded-sm border border-edge bg-raised px-1.5 py-0.5 font-mono text-xs text-moss">
                     {value}
                   </code>
                 );
               }
               return (
-                <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs" {...props}>
+                <code
+                  className="rounded-sm border border-edge bg-raised px-1.5 py-0.5 font-mono text-xs text-ink"
+                  {...props}
+                >
                   {children}
                 </code>
               );
@@ -187,7 +184,7 @@ export function MarkdownMessage({
           },
           a({ href, children }) {
             return (
-              <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+              <a href={href} target="_blank" rel="noreferrer">
                 {children}
               </a>
             );

@@ -1,4 +1,4 @@
-import { MessageCircleQuestion } from "lucide-react";
+import { Overline } from "@/components/common/Overline";
 
 interface FollowUpChipsProps {
   suggestions: string[];
@@ -11,10 +11,7 @@ export function FollowUpChips({ suggestions, onSelect, disabled }: FollowUpChips
 
   return (
     <div className="w-full space-y-2 pt-1">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <MessageCircleQuestion className="h-3.5 w-3.5" />
-        Follow-up questions
-      </p>
+      <Overline>Follow-up</Overline>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((s) => (
           <button
@@ -22,7 +19,7 @@ export function FollowUpChips({ suggestions, onSelect, disabled }: FollowUpChips
             type="button"
             disabled={disabled}
             onClick={() => onSelect(s.replace(/`/g, ""))}
-            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/10 disabled:opacity-50"
+            className="rounded-full border border-edge bg-raised px-3 py-1.5 text-left text-xs text-ink-2 transition-[transform,border-color,color] hover:border-ember/40 hover:text-ink active:scale-[0.98] disabled:opacity-50"
           >
             {s.replace(/`/g, "")}
           </button>

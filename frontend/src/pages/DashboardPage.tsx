@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Activity,
   Boxes,
   CheckSquare,
   Database,
@@ -16,11 +15,12 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { Overline } from "@/components/common/Overline";
 import { PageHeader } from "@/components/common/PageHeader";
 import { RepoCard } from "@/components/common/RepoCard";
 import { StatCard } from "@/components/common/StatCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogClose,
@@ -37,13 +37,15 @@ import { useRepoStore } from "@/store/repoStore";
 import { formatCompact } from "@/utils/format";
 import { removeRepositoriesFromBackend } from "@/utils/repositoryCleanup";
 import { staggerContainer } from "@/utils/motion";
+import { cn } from "@/utils/cn";
 import type { ActivityItem } from "@/types";
 
-const ACTIVITY_STYLES: Record<ActivityItem["type"], string> = {
-  index: "bg-emerald-500/15 text-emerald-400",
-  query: "bg-violet-500/15 text-violet-400",
-  upload: "bg-cyan-500/15 text-cyan-400",
-  error: "bg-red-500/15 text-red-400",
+/* Activity intent — dots, not fills. */
+const ACTIVITY_DOT: Record<ActivityItem["type"], string> = {
+  index: "bg-moss",
+  query: "bg-ember",
+  upload: "bg-gold",
+  error: "bg-rust",
 };
 
 export function DashboardPage() {
@@ -65,6 +67,7 @@ export function DashboardPage() {
   const totalChunks = repositories.reduce((acc, r) => acc + r.chunks, 0);
   const totalFiles = repositories.reduce((acc, r) => acc + r.files, 0);
   const indexed = repositories.filter((r) => r.status === "indexed").length;
+  const anyIndexing = repositories.some((r) => r.status === "indexing");
 
   const exitSelectionMode = () => {
     setSelectionMode(false);
@@ -118,10 +121,11 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
+        overline="Workspace"
         title="Dashboard"
-        description="Overview of your indexed repositories and recent activity."
+        description="Your indexed repositories and recent activity, at rest."
         actions={
-          <Button variant="gradient" onClick={() => navigate("/upload")}>
+          <Button onClick={() => navigate("/upload")}>
             <Plus />
             Add repository
           </Button>
@@ -129,19 +133,24 @@ export function DashboardPage() {
       />
 
       <motion.div
-        variants={staggerContainer(0.06)}
+        variants={staggerContainer(0.05)}
         initial="hidden"
         animate="show"
         className="grid grid-cols-2 gap-4 lg:grid-cols-4"
       >
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[116px] rounded-xl" />)
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[108px] rounded-lg" />)
         ) : (
           <>
-            <StatCard label="Repositories" value={`${repositories.length}`} icon={<FolderGit2 />} delta="+2" />
-            <StatCard label="Files indexed" value={formatCompact(totalFiles)} icon={<FileCode2 />} delta="+18%" accent="text-cyan-400" />
-            <StatCard label="Vector chunks" value={formatCompact(totalChunks)} icon={<Database />} delta="+9%" accent="text-fuchsia-400" />
-            <StatCard label="Indexed" value={`${indexed}/${repositories.length}`} icon={<Boxes />} accent="text-emerald-400" />
+            <StatCard label="Repositories" value={`${repositories.length}`} icon={<FolderGit2 />} />
+            <StatCard label="Files indexed" value={formatCompact(totalFiles)} icon={<FileCode2 />} />
+            <StatCard label="Vector chunks" value={formatCompact(totalChunks)} icon={<Database />} />
+            <StatCard
+              label="Indexed"
+              value={`${indexed}/${repositories.length}`}
+              icon={<Boxes />}
+              live={anyIndexing}
+            />
           </>
         )}
       </motion.div>
@@ -149,14 +158,18 @@ export function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Repositories</h2>
+            <Overline>Repositories</Overline>
             <div className="flex flex-wrap items-center gap-2">
               {selectionMode ? (
                 <>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="tnum font-mono text-[11px] text-ink-3">
                     {selectedIds.size} selected
                   </span>
-                  <Button variant="ghost" size="sm" onClick={selectedIds.size === repositories.length ? deselectAll : selectAll}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={selectedIds.size === repositories.length ? deselectAll : selectAll}
+                  >
                     <CheckSquare />
                     {selectedIds.size === repositories.length ? "Deselect all" : "Select all"}
                   </Button>
@@ -175,17 +188,12 @@ export function DashboardPage() {
                   </Button>
                 </>
               ) : (
-                <>
-                  {repositories.length > 0 && (
-                    <Button variant="secondary" size="sm" onClick={() => setSelectionMode(true)}>
-                      <CheckSquare />
-                      Select
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => navigate("/upload")}>
-                    View all
+                repositories.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectionMode(true)}>
+                    <CheckSquare />
+                    Select
                   </Button>
-                </>
+                )
               )}
             </div>
           </div>
@@ -193,16 +201,17 @@ export function DashboardPage() {
           {isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-[168px] rounded-xl" />
+                <Skeleton key={i} className="h-[196px] rounded-lg" />
               ))}
             </div>
           ) : repositories.length === 0 ? (
             <EmptyState
+              overline="EMPTY · NO REPOSITORIES"
               icon={<FolderGit2 />}
               title="No repositories yet"
               description="Connect your first GitHub repository to start asking questions about your code."
               action={
-                <Button variant="gradient" onClick={() => navigate("/upload")}>
+                <Button onClick={() => navigate("/upload")}>
                   <Plus />
                   Add repository
                 </Button>
@@ -210,7 +219,7 @@ export function DashboardPage() {
             />
           ) : (
             <motion.div
-              variants={staggerContainer(0.06)}
+              variants={staggerContainer(0.05)}
               initial="hidden"
               animate="show"
               className="grid gap-4 sm:grid-cols-2"
@@ -229,17 +238,14 @@ export function DashboardPage() {
         </div>
 
         <div>
-          <div className="mb-4 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">Recent activity</h2>
-          </div>
+          <Overline className="mb-4">Recent activity</Overline>
           <Card>
             <CardContent className="p-2">
               {isLoading ? (
                 <div className="space-y-3 p-3">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-8 w-8 rounded-lg" />
+                      <Skeleton className="h-2 w-2 rounded-full" />
                       <div className="flex-1 space-y-1.5">
                         <Skeleton className="h-3 w-2/3" />
                         <Skeleton className="h-3 w-1/2" />
@@ -248,17 +254,23 @@ export function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <ul className="divide-y divide-white/5">
+                <ul className="divide-y divide-edge">
                   {mockActivity.map((item) => (
-                    <li key={item.id} className="flex items-start gap-3 p-3 transition-colors hover:bg-white/[0.03]">
-                      <span className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg ${ACTIVITY_STYLES[item.type]}`}>
-                        <MessageSquareText className="h-4 w-4" />
-                      </span>
+                    <li
+                      key={item.id}
+                      className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-raised/60"
+                    >
+                      <span
+                        className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", ACTIVITY_DOT[item.type])}
+                        aria-hidden
+                      />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{item.title}</p>
-                        <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+                        <p className="truncate text-sm font-medium text-ink">{item.title}</p>
+                        <p className="mt-0.5 truncate font-mono text-[11px] text-ink-3">{item.detail}</p>
                       </div>
-                      <span className="whitespace-nowrap text-xs text-muted-foreground">{item.time}</span>
+                      <span className="whitespace-nowrap font-mono text-[11px] text-ink-3">
+                        {item.time}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -266,19 +278,15 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="mt-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Ask across all repos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Jump straight into a conversation with your entire codebase.
-              </p>
-              <Button variant="secondary" className="mt-4 w-full" onClick={() => navigate("/chat")}>
-                <MessageSquareText />
-                Open chat
-              </Button>
-            </CardContent>
+          <Card className="mt-4 p-5">
+            <Overline>Ask the codebase</Overline>
+            <p className="mt-2.5 text-sm leading-relaxed text-ink-2">
+              Jump straight into a conversation with your selected repository.
+            </p>
+            <Button variant="secondary" className="mt-4 w-full" onClick={() => navigate("/chat")}>
+              <MessageSquareText />
+              Open chat
+            </Button>
           </Card>
         </div>
       </div>
@@ -290,19 +298,17 @@ export function DashboardPage() {
               Remove {selectedIds.size} {selectedIds.size === 1 ? "repository" : "repositories"}?
             </DialogTitle>
             <DialogDescription>
-              This permanently deletes the selected repositories from your workspace, including parse
-              data, embeddings, and graph indexes. This cannot be undone.
+              This permanently deletes the selected repositories from your workspace, including
+              parse data, embeddings, and graph indexes. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground">
+          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-edge bg-raised p-3 font-mono text-xs text-ink-2">
             {selectedRepos.slice(0, 12).map((repo) => (
-              <li key={repo.id} className="truncate font-mono">
+              <li key={repo.id} className="truncate">
                 {repo.owner}/{repo.name}
               </li>
             ))}
-            {selectedRepos.length > 12 && (
-              <li className="text-muted-foreground">+ {selectedRepos.length - 12} more</li>
-            )}
+            {selectedRepos.length > 12 && <li className="text-ink-3">+ {selectedRepos.length - 12} more</li>}
           </ul>
           <DialogFooter>
             <DialogClose asChild>

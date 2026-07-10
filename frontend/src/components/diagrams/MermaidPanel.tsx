@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { cleanupMermaidArtifacts, renderMermaidSvg } from "@/components/diagrams/diagramUtils";
+import { Overline } from "@/components/common/Overline";
 import { cn } from "@/utils/cn";
 
 interface MermaidPanelProps {
@@ -41,24 +42,24 @@ export function MermaidPanel({ title, source, exportRef }: MermaidPanelProps) {
   }, [exportRef, svg]);
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
+    <div className="space-y-2.5">
+      <Overline>{title}</Overline>
       <div
         ref={containerRef}
         className={cn(
-          "overflow-auto rounded-xl border border-white/10 bg-[hsl(240_10%_7%)]/80 p-4",
+          "overflow-auto rounded-lg border border-edge bg-surface p-4 shadow-stratum",
           "min-h-[280px]",
         )}
       >
         {error ? (
           <div className="space-y-2">
-            <p className="text-xs text-red-400">{error}</p>
-            <pre className="overflow-x-auto text-xs text-muted-foreground">{source}</pre>
+            <p className="font-mono text-xs text-rust">{error}</p>
+            <pre className="overflow-x-auto font-mono text-xs text-ink-3">{source}</pre>
           </div>
         ) : svg ? (
           <div className="flex justify-center [&_svg]:max-w-full" dangerouslySetInnerHTML={{ __html: svg }} />
         ) : (
-          <p className="text-xs text-muted-foreground">Rendering diagram…</p>
+          <p className="animate-breathe font-mono text-xs text-ember">Rendering diagram…</p>
         )}
       </div>
     </div>

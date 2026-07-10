@@ -21,13 +21,17 @@ def register_middleware(app: FastAPI, settings: Settings) -> None:
         app: The FastAPI application instance.
         settings: Active application settings.
     """
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # In development, also allow any localhost port so Vite can use 5174, 5175, etc.
+    cors_kwargs: dict = {
+        "allow_origins": settings.cors_origins,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if not settings.is_production:
+        cors_kwargs["allow_origin_regex"] = r"http://(localhost|127\.0\.0\.1)(:\d+)?"
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     app.add_middleware(RequestLoggingMiddleware)
 

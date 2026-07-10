@@ -8,37 +8,38 @@ import {
   layoutSystemGraph,
 } from "@/components/diagrams/layoutGraph";
 
+/* Earth palette — kinds separated by hue AND luminance (grayscale-safe). */
 const KIND_COLORS: Record<string, string> = {
-  frontend: "#22d3ee",
-  backend: "#a78bfa",
-  service: "#e879f9",
-  database: "#34d399",
-  util: "#10b981",
-  core: "#8b5cf6",
-  file: "#8b5cf6",
-  api: "#22d3ee",
-  external: "#f59e0b",
+  frontend: "hsl(215 14% 58%)",
+  backend: "hsl(24 92% 58%)",
+  service: "hsl(38 55% 64%)",
+  database: "hsl(150 26% 50%)",
+  util: "hsl(150 26% 40%)",
+  core: "hsl(24 92% 58%)",
+  file: "hsl(28 8% 55%)",
+  api: "hsl(215 14% 58%)",
+  external: "hsl(44 85% 58%)",
 };
 
 const GROUP_COLORS: Record<string, string> = {
-  frontend: "#22d3ee",
-  presentation: "#a78bfa",
-  business: "#e879f9",
-  data: "#34d399",
-  infrastructure: "#10b981",
-  api: "#22d3ee",
-  service: "#e879f9",
-  util: "#10b981",
-  core: "#8b5cf6",
-  external: "#f59e0b",
+  frontend: "hsl(215 14% 58%)",
+  presentation: "hsl(215 14% 70%)",
+  business: "hsl(38 55% 64%)",
+  data: "hsl(150 26% 50%)",
+  infrastructure: "hsl(150 26% 40%)",
+  api: "hsl(215 14% 58%)",
+  service: "hsl(38 55% 64%)",
+  util: "hsl(150 26% 40%)",
+  core: "hsl(24 92% 58%)",
+  external: "hsl(44 85% 58%)",
 };
 
 export function visToFlowNodes(nodes: VisNode[], mode: "system" | "dependency"): Node[] {
   return nodes.map((n) => {
     const color =
       mode === "dependency"
-        ? GROUP_COLORS[n.group] ?? KIND_COLORS[n.kind] ?? "#8b5cf6"
-        : KIND_COLORS[n.kind] ?? GROUP_COLORS[n.group] ?? "#8b5cf6";
+        ? GROUP_COLORS[n.group] ?? KIND_COLORS[n.kind] ?? "hsl(24 92% 58%)"
+        : KIND_COLORS[n.kind] ?? GROUP_COLORS[n.group] ?? "hsl(24 92% 58%)";
     return {
       id: n.id,
       position: {
@@ -63,8 +64,12 @@ export function visToFlowEdges(edges: VisEdge[]): Edge[] {
     source: e.source,
     target: e.target,
     label: e.label,
+    // Live heat rule: only active flow paths carry animated ember dashes.
     animated: e.kind === "flow" || e.kind === "cross_layer",
-    style: { stroke: e.kind === "import" ? "rgba(255,255,255,0.25)" : "#a78bfa" },
+    style: {
+      stroke:
+        e.kind === "import" ? "hsl(26 12% 26%)" : "hsl(24 92% 58% / 0.6)",
+    },
   }));
 }
 
@@ -104,7 +109,7 @@ export async function exportElementPng(element: HTMLElement, filename: string) {
   const { toPng } = await import("html-to-image");
   const dataUrl = await toPng(element, {
     pixelRatio: 2,
-    backgroundColor: "#09090b",
+    backgroundColor: "#0d0b09",
     cacheBust: true,
   });
   const anchor = document.createElement("a");
@@ -116,7 +121,7 @@ export async function exportElementPng(element: HTMLElement, filename: string) {
 export async function exportElementSvg(element: HTMLElement, filename: string) {
   const { toSvg } = await import("html-to-image");
   const dataUrl = await toSvg(element, {
-    backgroundColor: "#09090b",
+    backgroundColor: "#0d0b09",
     cacheBust: true,
   });
   const anchor = document.createElement("a");
@@ -139,9 +144,21 @@ export async function renderMermaidSvg(source: string, id: string): Promise<stri
   const mermaid = (await import("mermaid")).default;
   mermaid.initialize({
     startOnLoad: false,
-    theme: "dark",
+    theme: "base",
     securityLevel: "loose",
     suppressErrorRendering: true,
+    themeVariables: {
+      darkMode: true,
+      background: "#0d0b09",
+      primaryColor: "#1a1613",
+      primaryTextColor: "#f0ebe3",
+      primaryBorderColor: "#2b2620",
+      lineColor: "#6b6257",
+      secondaryColor: "#211c17",
+      tertiaryColor: "#14100d",
+      fontFamily: '"IBM Plex Mono", monospace',
+      fontSize: "13px",
+    },
   });
 
   const sanitized = source.trim() || "flowchart TB\n  empty[No diagram data]";

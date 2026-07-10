@@ -8,8 +8,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { navItems } from "@/components/layout/navigation";
 import { useAppStore } from "@/store/appStore";
 import { cn } from "@/utils/cn";
+import { settle, snap } from "@/utils/motion";
 
-/** Collapsible primary sidebar with active-route highlighting. */
+/*
+ * Primary sidebar — a stratum standing at the left edge. The active route
+ * is marked by a single shared ember rail that slides between items.
+ */
 export function Sidebar() {
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -17,16 +21,17 @@ export function Sidebar() {
   return (
     <motion.aside
       initial={false}
-      animate={{ width: collapsed ? 76 : 256 }}
-      transition={{ type: "spring", stiffness: 380, damping: 34 }}
-      className="sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-white/10 bg-white/[0.02] backdrop-blur-xl md:flex"
+      animate={{ width: collapsed ? 72 : 264 }}
+      transition={settle}
+      className="sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-edge bg-surface md:flex"
     >
-      <div className={cn("flex h-16 items-center border-b border-white/10 px-4", collapsed && "justify-center px-0")}>
+      <div className={cn("flex h-16 items-center border-b border-edge px-5", collapsed && "justify-center px-0")}>
         {collapsed ? <Logo showWordmark={false} to="/" /> : <Logo to="/" />}
       </div>
 
       <TooltipProvider delayDuration={0}>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Primary">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-3" aria-label="Primary">
+          {!collapsed && <span className="overline-label block px-3 pb-2 pt-1">Workspace</span>}
           {navItems.map((item) => (
             <Tooltip key={item.to}>
               <TooltipTrigger asChild>
@@ -34,11 +39,9 @@ export function Sidebar() {
                   to={item.to}
                   className={({ isActive }) =>
                     cn(
-                      "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      collapsed && "justify-center px-0",
-                      isActive
-                        ? "bg-white/10 text-foreground"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      collapsed && "justify-center px-0 py-2.5",
+                      isActive ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised/60 hover:text-ink",
                     )
                   }
                 >
@@ -47,22 +50,34 @@ export function Sidebar() {
                       {isActive && (
                         <motion.span
                           layoutId="sidebar-active"
-                          className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-violet-400 to-cyan-400"
+                          transition={snap}
+                          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-ember"
                         />
                       )}
-                      <item.icon className="h-[18px] w-[18px] shrink-0" />
+                      <item.icon
+                        className={cn(
+                          "h-[17px] w-[17px] shrink-0 transition-colors",
+                          isActive ? "text-ember" : "text-ink-3 group-hover:text-ink-2",
+                        )}
+                      />
                       <AnimatePresence initial={false}>
                         {!collapsed && (
                           <motion.span
                             initial={{ opacity: 0, x: -6 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -6 }}
+                            transition={snap}
                             className="truncate"
                           >
                             {item.label}
                           </motion.span>
                         )}
                       </AnimatePresence>
+                      {!collapsed && item.shortcut && (
+                        <span className="ml-auto font-mono text-[10px] tracking-widest text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
+                          {item.shortcut}
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>
@@ -73,12 +88,13 @@ export function Sidebar() {
         </nav>
       </TooltipProvider>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-edge p-3">
         <Button
           variant="ghost"
           size={collapsed ? "icon" : "default"}
           onClick={toggleSidebar}
-          className={cn("w-full", collapsed && "w-auto")}
+          className={cn("w-full justify-start", collapsed && "w-auto justify-center")}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <PanelLeft /> : <ChevronsLeft />}
           {!collapsed && <span>Collapse</span>}

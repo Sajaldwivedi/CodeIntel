@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Brain, Loader2, Send, Sparkles } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { streamAgentChat } from "@/api/agent";
 import { CitationPanel } from "@/components/chat/CitationPanel";
 import { FollowUpChips } from "@/components/chat/FollowUpChips";
 import { MarkdownMessage } from "@/components/chat/MarkdownMessage";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Overline } from "@/components/common/Overline";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { useRepoStore } from "@/store/repoStore";
 import { cn } from "@/utils/cn";
+import { settle } from "@/utils/motion";
 import type { ChatMessage } from "@/types";
 
 const SUGGESTIONS = [
@@ -21,6 +21,19 @@ const SUGGESTIONS = [
   "Explain the request lifecycle",
   "What are the main API endpoints?",
 ];
+
+/** Breathing ember dot — the AI's presence. Hot while working, still at rest. */
+function EmberDot({ live }: { live?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "mt-2 h-2.5 w-2.5 shrink-0 rounded-full",
+        live ? "animate-breathe bg-ember shadow-ember-glow" : "bg-ember/70",
+      )}
+      aria-hidden
+    />
+  );
+}
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -96,9 +109,7 @@ export function ChatPage() {
         (event) => {
           if (event.type === "status") {
             setMessages((m) =>
-              m.map((msg) =>
-                msg.id === assistantId ? { ...msg, statusLabel: event.message } : msg,
-              ),
+              m.map((msg) => (msg.id === assistantId ? { ...msg, statusLabel: event.message } : msg)),
             );
             return;
           }
@@ -150,9 +161,7 @@ export function ChatPage() {
           if (event.type === "token") {
             setMessages((m) =>
               m.map((msg) =>
-                msg.id === assistantId
-                  ? { ...msg, content: msg.content + event.text }
-                  : msg,
+                msg.id === assistantId ? { ...msg, content: msg.content + event.text } : msg,
               ),
             );
             return;
@@ -182,53 +191,47 @@ export function ChatPage() {
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && !m.isStreaming);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-edge pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-400/20 text-primary">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold">Code Chat</h1>
-            <p className="text-xs text-muted-foreground">
-              AI Software Engineer ·{" "}
-              <span className="text-foreground">
-                {activeRepo?.owner}/{activeRepo?.name}
-              </span>
+          <EmberDot live={thinking} />
+          <div className="-mt-1">
+            <Overline>Repository chat</Overline>
+            <p className="mt-1 font-mono text-[13px] text-ink">
+              {activeRepo ? `${activeRepo.owner}/${activeRepo.name}` : "no repository selected"}
             </p>
           </div>
         </div>
-        <Badge variant="secondary" className="gap-1.5">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          Streaming
-        </Badge>
+        {sessionId && (
+          <span className="font-mono text-[10px] tracking-[0.14em] text-ink-3">SESSION ACTIVE</span>
+        )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto py-6">
+      {/* Conversation */}
+      <div ref={scrollRef} className="flex-1 space-y-8 overflow-y-auto py-8">
         {!hasMessages ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <motion.div
+            <motion.span
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-cyan-400/20 text-primary"
-            >
-              <Sparkles className="h-7 w-7" />
-            </motion.div>
-            <h2 className="mt-5 text-xl font-semibold">Ask anything about this codebase</h2>
-            <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
-              Grounded answers with file references, function citations, reasoning summaries, and
-              follow-up suggestions.
+              transition={settle}
+              className="h-3 w-3 rounded-full bg-ember shadow-ember-glow"
+            />
+            <h2 className="mt-6 font-display text-2xl font-semibold text-ink">
+              Ask anything about this codebase
+            </h2>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-2">
+              Grounded answers with file citations, reasoning summaries, and follow-up suggestions.
             </p>
-            <div className="mt-8 grid w-full max-w-xl gap-3 sm:grid-cols-2">
+            <div className="mt-10 grid w-full max-w-xl gap-2.5 sm:grid-cols-2">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="group rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left text-sm transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/5"
+                  className="group rounded-md border border-edge bg-surface p-4 text-left text-sm text-ink-2 shadow-stratum transition-[transform,border-color,color] duration-200 hover:-translate-y-0.5 hover:border-edge-strong hover:text-ink active:scale-[0.99]"
                 >
-                  <span className="text-muted-foreground transition-colors group-hover:text-foreground">
-                    {s}
-                  </span>
+                  {s}
                 </button>
               ))}
             </div>
@@ -236,14 +239,14 @@ export function ChatPage() {
         ) : (
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} onFileClick={openFile} />
+              <Message key={msg.id} message={msg} onFileClick={openFile} />
             ))}
           </AnimatePresence>
         )}
       </div>
 
       {lastAssistant?.followUpSuggestions && lastAssistant.followUpSuggestions.length > 0 && (
-        <div className="border-t border-white/5 px-1 py-3">
+        <div className="border-t border-edge px-1 py-3">
           <FollowUpChips
             suggestions={lastAssistant.followUpSuggestions}
             onSelect={send}
@@ -252,8 +255,9 @@ export function ChatPage() {
         </div>
       )}
 
-      <div className="border-t border-white/10 pt-4">
-        {error && <p className="mb-2 text-center text-xs text-red-400">{error}</p>}
+      {/* Composer */}
+      <div className="border-t border-edge pt-4">
+        {error && <p className="mb-2 text-center font-mono text-xs text-rust">{error}</p>}
         <div className="relative">
           <Textarea
             value={input}
@@ -265,29 +269,28 @@ export function ChatPage() {
               }
             }}
             placeholder="Ask about functions, files, architecture…"
-            className="min-h-[56px] pr-14"
+            className="min-h-[56px] bg-surface pr-14 shadow-stratum"
             disabled={thinking}
           />
           <Button
             size="icon"
-            variant="gradient"
             className="absolute bottom-2.5 right-2.5 h-9 w-9"
             onClick={() => send(input)}
             disabled={!input.trim() || thinking}
+            aria-label="Send message"
           >
             {thinking ? <Loader2 className="animate-spin" /> : <ArrowUp />}
           </Button>
         </div>
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          <Send className="mr-1 inline h-3 w-3" />
-          Press Enter to send · Shift+Enter for a new line
+        <p className="mt-2 text-center font-mono text-[10px] tracking-[0.14em] text-ink-3">
+          ENTER TO SEND · SHIFT+ENTER FOR NEW LINE
         </p>
       </div>
     </div>
   );
 }
 
-function MessageBubble({
+function Message({
   message,
   onFileClick,
 }: {
@@ -295,35 +298,37 @@ function MessageBubble({
   onFileClick: (path: string, line?: number) => void;
 }) {
   const isUser = message.role === "user";
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+
+  /* User: a compact raised bubble, right-aligned.
+     Assistant: full-width prose on the bedrock — no bubble, just the ember dot. */
+  if (isUser) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={settle}
+        className="flex justify-end"
+      >
+        <div className="max-w-[85%] rounded-lg rounded-br-sm border border-edge bg-raised px-4 py-2.5 text-sm leading-relaxed text-ink shadow-stratum">
+          {message.content}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("flex gap-3", isUser && "flex-row-reverse")}
+      transition={settle}
+      className="flex gap-3.5"
     >
-      <Avatar className="h-8 w-8 shrink-0">
-        {isUser ? (
-          <AvatarFallback>You</AvatarFallback>
-        ) : (
-          <AvatarFallback className="from-violet-500 to-cyan-400">
-            <Sparkles className="h-4 w-4" />
-          </AvatarFallback>
-        )}
-      </Avatar>
+      <EmberDot live={message.isStreaming} />
 
-      <div className={cn("max-w-3xl space-y-3", isUser && "flex flex-col items-end")}>
-        <div
-          className={cn(
-            "rounded-2xl px-4 py-3 text-sm leading-relaxed",
-            isUser
-              ? "bg-primary text-primary-foreground"
-              : "border border-white/10 bg-white/[0.03]",
-          )}
-        >
-          {isUser ? (
-            message.content
-          ) : message.content ? (
+      <div className="min-w-0 flex-1 space-y-4">
+        {message.content ? (
+          <div>
             <MarkdownMessage
               content={message.content}
               citations={message.citations}
@@ -331,63 +336,65 @@ function MessageBubble({
               functionReferences={message.functionReferences}
               onFileClick={onFileClick}
             />
-          ) : message.isStreaming ? (
-            <div className="flex flex-col gap-2">
-              <span className="inline-flex items-center gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <motion.span
-                    key={i}
-                    className="h-2 w-2 rounded-full bg-muted-foreground"
-                    animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-                  />
-                ))}
-              </span>
-              {message.statusLabel && (
-                <span className="text-xs text-muted-foreground">{message.statusLabel}</span>
-              )}
-            </div>
-          ) : null}
-          {message.isStreaming && message.content ? (
-            <span className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-primary/80" />
-          ) : null}
-        </div>
+            {message.isStreaming && (
+              <span className="ml-0.5 inline-block h-4 w-[7px] animate-caret-blink bg-ember align-middle" aria-hidden />
+            )}
+          </div>
+        ) : message.isStreaming ? (
+          <p className="animate-breathe font-mono text-[13px] text-ember" aria-live="polite">
+            {message.statusLabel ?? "Working…"}
+          </p>
+        ) : null}
 
-        {!isUser && message.confidence !== undefined && !message.isStreaming && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="secondary">Confidence {(message.confidence * 100).toFixed(0)}%</Badge>
+        {!message.isStreaming && (message.confidence !== undefined || message.toolsUsed?.length) && (
+          <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-ink-3">
+            {message.confidence !== undefined && (
+              <span className="tnum rounded-sm border border-edge bg-raised px-2 py-0.5">
+                confidence {(message.confidence * 100).toFixed(0)}%
+              </span>
+            )}
             {message.toolsUsed?.map((tool) => (
-              <Badge key={tool} variant="secondary">
+              <span key={tool} className="rounded-sm border border-edge bg-raised px-2 py-0.5">
                 {tool}
-              </Badge>
+              </span>
             ))}
           </div>
         )}
 
-        {!isUser && message.reasoningSummary && !message.isStreaming && (
-          <div className="flex gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-muted-foreground">
-            <Brain className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
-            <div>
-              <p className="font-medium text-foreground/80">Reasoning summary</p>
-              <p className="mt-0.5">{message.reasoningSummary}</p>
-            </div>
+        {!message.isStreaming && message.reasoningSummary && (
+          <div className="rounded-md border border-edge bg-surface px-3.5 py-3 shadow-stratum">
+            <button
+              type="button"
+              onClick={() => setReasoningOpen((o) => !o)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <Overline>Reasoning</Overline>
+              {message.reasoningSteps && message.reasoningSteps.length > 1 && (
+                <ChevronDown
+                  className={cn("h-3.5 w-3.5 text-ink-3 transition-transform", reasoningOpen && "rotate-180")}
+                />
+              )}
+            </button>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-2">{message.reasoningSummary}</p>
+            <AnimatePresence initial={false}>
+              {reasoningOpen && message.reasoningSteps && message.reasoningSteps.length > 1 && (
+                <motion.ol
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="mt-3 list-decimal space-y-1.5 overflow-hidden border-t border-edge pl-4 pt-3 text-[13px] text-ink-2"
+                >
+                  {message.reasoningSteps.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </motion.ol>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
-        {message.reasoningSteps && message.reasoningSteps.length > 1 && !isUser && !message.isStreaming && (
-          <details className="w-full text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-medium">
-              Reasoning steps ({message.reasoningSteps.length})
-            </summary>
-            <ol className="mt-2 list-decimal space-y-1 pl-4">
-              {message.reasoningSteps.map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ol>
-          </details>
-        )}
-
-        {!isUser && !message.isStreaming && (message.citations?.length || message.fileReferences?.length) ? (
+        {!message.isStreaming && (message.citations?.length || message.fileReferences?.length) ? (
           <CitationPanel
             citations={message.citations ?? []}
             fileReferences={message.fileReferences}

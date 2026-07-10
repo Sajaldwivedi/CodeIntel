@@ -10,8 +10,6 @@ import { ExportToolbar } from "@/components/diagrams/ExportToolbar";
 import { graphViewToFlow, cleanupMermaidArtifacts } from "@/components/diagrams/diagramUtils";
 import { InteractiveGraph } from "@/components/diagrams/InteractiveGraph";
 import { MermaidPanel } from "@/components/diagrams/MermaidPanel";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRepoStore } from "@/store/repoStore";
@@ -27,21 +25,24 @@ interface DiagramsPageProps {
 
 const VIEW_META: Record<
   Exclude<DiagramView, "all">,
-  { title: string; description: string; icon: typeof Workflow }
+  { overline: string; title: string; description: string; icon: typeof Workflow }
 > = {
   system: {
-    title: "System Architecture",
-    description: "Layered view: Frontend → API → Services → Database",
+    overline: "Map room · System",
+    title: "Architecture Explorer",
+    description: "Layered view of the system: frontend → API → services → data.",
     icon: Workflow,
   },
   dependency: {
+    overline: "Map room · Imports",
     title: "Dependency Graph",
-    description: "Module import relationships across the codebase",
+    description: "Module import relationships across the codebase.",
     icon: Network,
   },
   mermaid: {
+    overline: "Map room · Diagrams",
     title: "Mermaid Diagrams",
-    description: "Flowchart, sequence, and class diagrams",
+    description: "Flowchart, sequence, and class diagrams.",
     icon: Layers,
   },
 };
@@ -101,16 +102,21 @@ export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
   }, [load]);
 
   const systemFlow = useMemo(
-    () => (bundle ? graphViewToFlow(bundle.system_architecture, "system") : { nodes: [], edges: [], truncated: false }),
+    () =>
+      bundle
+        ? graphViewToFlow(bundle.system_architecture, "system")
+        : { nodes: [], edges: [], truncated: false },
     [bundle],
   );
   const depFlow = useMemo(
-    () => (bundle ? graphViewToFlow(bundle.dependency_graph, "dependency") : { nodes: [], edges: [], truncated: false }),
+    () =>
+      bundle
+        ? graphViewToFlow(bundle.dependency_graph, "dependency")
+        : { nodes: [], edges: [], truncated: false },
     [bundle],
   );
 
   const meta = VIEW_META[activeView === "mermaid" ? "mermaid" : activeView];
-  const Icon = meta.icon;
 
   const renderSystem = () => (
     <>
@@ -121,8 +127,8 @@ export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
         exportRef={viewportRef}
         emptyMessage="No system architecture graph indexed for this repository."
       />
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        Pan, zoom, and drag nodes · {systemFlow.nodes.length} components, {systemFlow.edges.length} links
+      <p className="tnum mt-2.5 text-center font-mono text-[11px] text-ink-3">
+        PAN · ZOOM · DRAG — {systemFlow.nodes.length} components, {systemFlow.edges.length} links
       </p>
     </>
   );
@@ -136,56 +142,52 @@ export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
         exportRef={viewportRef}
         emptyMessage="No import/dependency edges indexed for this repository."
       />
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        {depFlow.truncated
-          ? `Showing top ${depFlow.nodes.length} modules by connectivity · `
-          : ""}
+      <p className="tnum mt-2.5 text-center font-mono text-[11px] text-ink-3">
+        {depFlow.truncated ? `TOP ${depFlow.nodes.length} MODULES BY CONNECTIVITY — ` : ""}
         {depFlow.nodes.length} modules, {depFlow.edges.length} imports
       </p>
     </>
   );
 
   const renderMermaid = () => (
-    <div ref={viewportRef} className="grid gap-4 lg:grid-cols-2">
+    <div ref={viewportRef} className="grid gap-6 lg:grid-cols-2">
       <MermaidPanel title="Flowchart" source={bundle!.mermaid.flowchart} />
       <MermaidPanel title="Sequence diagram" source={bundle!.mermaid.sequence} />
-      <Card className="lg:col-span-2">
-        <CardContent className="p-4">
-          <MermaidPanel title="Class diagram" source={bundle!.mermaid.class_diagram} />
-        </CardContent>
-      </Card>
+      <div className="lg:col-span-2">
+        <MermaidPanel title="Class diagram" source={bundle!.mermaid.class_diagram} />
+      </div>
     </div>
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={view === "all" ? "Architecture Diagrams" : meta.title}
-        description={
-          activeRepo
-            ? `${meta.description} · ${activeRepo.owner}/${activeRepo.name}`
-            : meta.description
+        overline={
+          activeRepo ? `${meta.overline} · ${activeRepo.owner}/${activeRepo.name}` : meta.overline
         }
-        icon={<Icon />}
+        title={view === "all" ? "Architecture Diagrams" : meta.title}
+        description={meta.description}
         actions={
           bundle ? (
             <ExportToolbar bundle={bundle} viewportRef={viewportRef} activeTab={activeView} />
           ) : loading ? (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Loader2 className="h-4 w-4 animate-spin text-ink-3" />
           ) : null
         }
       />
 
-      {bundle && activeView === "system" && (
-        <Badge variant="secondary">Frontend → API → Services → DB</Badge>
-      )}
-
       {loading ? (
-        <Skeleton className="h-[620px] w-full rounded-xl" />
+        <Skeleton className="h-[620px] w-full rounded-lg" />
       ) : error ? (
         <ErrorState description={error} onRetry={load} />
       ) : bundle && view !== "all" ? (
-        activeView === "system" ? renderSystem() : activeView === "dependency" ? renderDependency() : renderMermaid()
+        activeView === "system" ? (
+          renderSystem()
+        ) : activeView === "dependency" ? (
+          renderDependency()
+        ) : (
+          renderMermaid()
+        )
       ) : bundle ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as DiagramTab)}>
           <TabsList>
@@ -203,13 +205,13 @@ export function DiagramsPage({ view = "all" }: DiagramsPageProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="system" className="mt-4">
+          <TabsContent value="system" className="mt-5">
             {tab === "system" && renderSystem()}
           </TabsContent>
-          <TabsContent value="dependency" className="mt-4">
+          <TabsContent value="dependency" className="mt-5">
             {tab === "dependency" && renderDependency()}
           </TabsContent>
-          <TabsContent value="mermaid" className="mt-4">
+          <TabsContent value="mermaid" className="mt-5">
             {tab === "mermaid" && renderMermaid()}
           </TabsContent>
         </Tabs>

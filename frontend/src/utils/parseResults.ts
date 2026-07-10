@@ -1,16 +1,17 @@
 import type { FileNode, LanguageBreakdown } from "@/types";
 import type { ParsedFileResult } from "@/types/parse";
 
+/* Earth palette — luminance-separated so it survives grayscale. */
 const LANGUAGE_COLORS: Record<string, string> = {
-  Python: "#fbbf24",
-  TypeScript: "#38bdf8",
-  JavaScript: "#facc15",
-  Go: "#22d3ee",
-  Rust: "#fb923c",
-  Java: "#f87171",
-  "C++": "#a78bfa",
-  C: "#94a3b8",
-  Other: "#64748b",
+  Python: "hsl(150 26% 50%)",
+  TypeScript: "hsl(215 14% 58%)",
+  JavaScript: "hsl(44 85% 58%)",
+  Go: "hsl(150 26% 40%)",
+  Rust: "hsl(24 92% 58%)",
+  Java: "hsl(10 42% 52%)",
+  "C++": "hsl(38 55% 64%)",
+  C: "hsl(28 8% 55%)",
+  Other: "hsl(28 8% 42%)",
 };
 
 /** Build a nested file tree from flat parsed file paths. */

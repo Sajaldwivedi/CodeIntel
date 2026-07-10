@@ -1,13 +1,18 @@
+/*
+ * Chart palette — earthy hues separated by luminance, never by saturation
+ * alone, so every chart remains legible in grayscale.
+ */
+
 const LANGUAGE_COLORS: Record<string, string> = {
-  python: "#3b82f6",
-  typescript: "#06b6d4",
-  javascript: "#eab308",
-  tsx: "#22d3ee",
-  jsx: "#f59e0b",
-  go: "#34d399",
-  rust: "#f97316",
-  java: "#ef4444",
-  unknown: "#94a3b8",
+  python: "hsl(150 26% 50%)",
+  typescript: "hsl(215 14% 58%)",
+  javascript: "hsl(44 85% 58%)",
+  tsx: "hsl(215 14% 70%)",
+  jsx: "hsl(44 70% 68%)",
+  go: "hsl(150 26% 40%)",
+  rust: "hsl(24 92% 58%)",
+  java: "hsl(10 42% 52%)",
+  unknown: "hsl(28 8% 42%)",
 };
 
 export function languageColor(language: string): string {
@@ -15,14 +20,25 @@ export function languageColor(language: string): string {
 }
 
 export const COMPLEXITY_COLORS = {
-  low: "#34d399",
-  medium: "#fbbf24",
-  high: "#f87171",
+  low: "hsl(150 30% 52%)",
+  medium: "hsl(44 85% 58%)",
+  high: "hsl(8 68% 56%)",
 } as const;
 
 export const CHART_THEME = {
-  grid: "rgba(255,255,255,0.06)",
-  axis: "rgba(255,255,255,0.45)",
-  tooltipBg: "rgba(15,15,20,0.95)",
-  tooltipBorder: "rgba(255,255,255,0.12)",
+  grid: "hsl(26 10% 15.5%)",
+  axis: "hsl(28 6% 45%)",
+  tooltipBg: "hsl(24 10% 12%)",
+  tooltipBorder: "hsl(26 10% 15.5%)",
+  ember: "hsl(24 92% 58%)",
 };
+
+/** Ordered series palette: ember → sand → moss → clay → slate → stone. */
+export const SERIES_COLORS = [
+  "hsl(24 92% 58%)",
+  "hsl(38 55% 64%)",
+  "hsl(150 26% 50%)",
+  "hsl(10 42% 52%)",
+  "hsl(215 14% 58%)",
+  "hsl(28 8% 42%)",
+];

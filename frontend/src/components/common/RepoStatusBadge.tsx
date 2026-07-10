@@ -1,23 +1,22 @@
-import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/utils/cn";
 import type { RepoStatus } from "@/types";
 
-const CONFIG: Record<
-  RepoStatus,
-  { label: string; variant: "success" | "warning" | "danger" | "secondary"; icon: typeof Clock; spin?: boolean }
-> = {
-  indexed: { label: "Indexed", variant: "success", icon: CheckCircle2 },
-  indexing: { label: "Indexing", variant: "warning", icon: Loader2, spin: true },
-  queued: { label: "Queued", variant: "secondary", icon: Clock },
-  failed: { label: "Failed", variant: "danger", icon: XCircle },
+/*
+ * Live heat rule: only a working process breathes. Indexed/queued/failed
+ * repos are stone-cold; an indexing repo pulses ember.
+ */
+const CONFIG: Record<RepoStatus, { label: string; variant: "success" | "warning" | "danger" | "secondary"; live?: boolean }> = {
+  indexed: { label: "Indexed", variant: "success" },
+  indexing: { label: "Indexing", variant: "warning", live: true },
+  queued: { label: "Queued", variant: "secondary" },
+  failed: { label: "Failed", variant: "danger" },
 };
 
 export function RepoStatusBadge({ status }: { status: RepoStatus }) {
-  const { label, variant, icon: Icon, spin } = CONFIG[status];
+  const { label, variant, live } = CONFIG[status];
   return (
-    <Badge variant={variant}>
-      <Icon className={spin ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
+    <Badge variant={variant} dot={variant !== "secondary"} className={cn("font-mono text-[11px]", live && "[&>span]:animate-breathe [&>span]:bg-ember text-ember")}>
       {label}
     </Badge>
   );

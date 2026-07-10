@@ -30,7 +30,7 @@ const AvatarFallback = React.forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      "flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-xs font-semibold text-white",
+      "flex h-full w-full items-center justify-center rounded-full border border-edge bg-raised font-mono text-xs font-medium text-ink-2",
       className,
     )}
     {...props}

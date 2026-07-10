@@ -1,31 +1,25 @@
 import { motion } from "framer-motion";
-import {
-  CheckCircle2,
-  Circle,
-  Database,
-  GitBranch,
-  Loader2,
-  Network,
-  ScanSearch,
-  Sparkles,
-  XCircle,
-} from "lucide-react";
+import { Check, X } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Overline } from "@/components/common/Overline";
 import type { IngestionJob, IngestionStage } from "@/types/ingestion";
 import { cn } from "@/utils/cn";
+import { settle } from "@/utils/motion";
 
-const PIPELINE_STEPS: {
-  stage: IngestionStage;
-  label: string;
-  icon: typeof GitBranch;
-}[] = [
-  { stage: "validating", label: "Validate", icon: GitBranch },
-  { stage: "cloning", label: "Clone", icon: GitBranch },
-  { stage: "parsing", label: "Parse", icon: ScanSearch },
-  { stage: "graphing", label: "Graph", icon: Network },
-  { stage: "indexing", label: "Index", icon: Database },
-  { stage: "embedding", label: "Embed", icon: Sparkles },
+/*
+ * The machine at work — ingestion as excavation. Six strata fill from the
+ * top down: the active layer carries an ember scan-line and breathes; a
+ * finished layer flashes moss, then settles. Everything idle stays stone.
+ */
+
+const PIPELINE_STEPS: { stage: IngestionStage; label: string; detail: string }[] = [
+  { stage: "validating", label: "Validate", detail: "Verify source and access" },
+  { stage: "cloning", label: "Clone", detail: "Fetch working tree" },
+  { stage: "parsing", label: "Parse", detail: "Tree-sitter symbol extraction" },
+  { stage: "graphing", label: "Graph", detail: "Build knowledge graph" },
+  { stage: "indexing", label: "Index", detail: "Persist symbols and chunks" },
+  { stage: "embedding", label: "Embed", detail: "Vector embeddings" },
 ];
 
 const STAGE_ORDER: IngestionStage[] = [
@@ -44,21 +38,6 @@ function stageIndex(stage: IngestionStage): number {
   return idx === -1 ? STAGE_ORDER.indexOf("parsing") : idx;
 }
 
-function StepIcon({
-  done,
-  active,
-  failed,
-}: {
-  done: boolean;
-  active: boolean;
-  failed: boolean;
-}) {
-  if (failed) return <XCircle className="h-4 w-4 text-red-400" />;
-  if (done) return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
-  if (active) return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
-  return <Circle className="h-4 w-4 text-muted-foreground/40" />;
-}
-
 interface IngestionProgressProps {
   job: IngestionJob;
   className?: string;
@@ -67,63 +46,106 @@ interface IngestionProgressProps {
 export function IngestionProgress({ job, className }: IngestionProgressProps) {
   const currentIdx = stageIndex(job.stage);
   const failed = job.stage === "failed";
+  const completed = job.stage === "completed";
 
   return (
     <Card className={cn("overflow-hidden p-6", className)}>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium">
-            {failed ? "Ingestion failed" : job.stage === "completed" ? "Ingestion complete" : "Ingesting repository…"}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Overline className={cn(failed ? "text-rust" : completed ? "text-moss" : "text-ember")}>
+            {failed
+              ? "INGESTION · FAILED"
+              : completed
+                ? "INGESTION · COMPLETE"
+                : `INGESTION · STAGE ${Math.min(Math.max(currentIdx, 1), 6)}/6`}
+          </Overline>
+          <p className="mt-2 truncate font-mono text-[13px] text-ink-2" aria-live="polite">
+            {job.message}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{job.message}</p>
         </div>
-        <span className="text-sm font-semibold tabular-nums text-primary">{job.progress}%</span>
+        <span
+          className={cn(
+            "tnum shrink-0 font-display text-3xl font-semibold leading-none tracking-tight",
+            failed ? "text-rust" : completed ? "text-moss" : "animate-breathe text-ember",
+          )}
+        >
+          {job.progress}%
+        </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+      {/* Overall progress — a thin seam of heat. */}
+      <div className="mt-5 h-1 overflow-hidden rounded-full bg-raised">
         <motion.div
-          className={cn(
-            "h-full rounded-full",
-            failed
-              ? "bg-red-500"
-              : "bg-gradient-to-r from-violet-500 to-cyan-400",
-          )}
+          className={cn("h-full rounded-full", failed ? "bg-rust" : completed ? "bg-moss" : "bg-ember")}
           initial={{ width: 0 }}
           animate={{ width: `${job.progress}%` }}
-          transition={{ ease: "easeOut", duration: 0.4 }}
+          transition={settle}
         />
       </div>
 
-      {/* Step tracker */}
-      <ol className="mt-6 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      {/* The strata column. */}
+      <ol className="mt-6 space-y-1.5">
         {PIPELINE_STEPS.map((step) => {
           const stepIdx = stageIndex(step.stage);
-          const done = !failed && (job.stage === "completed" || currentIdx > stepIdx);
+          const done = !failed && (completed || currentIdx > stepIdx);
           const active = !failed && job.stage === step.stage;
-          const stepFailed = failed && job.stage !== "completed" && currentIdx >= stepIdx && currentIdx <= stepIdx + 1;
+          const stepFailed = failed && currentIdx === stepIdx;
 
           return (
             <li
               key={step.stage}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors",
-                active && "border-primary/40 bg-primary/5",
-                done && "border-emerald-500/20 bg-emerald-500/5",
-                stepFailed && "border-red-500/30 bg-red-500/5",
-                !active && !done && !stepFailed && "border-white/5 bg-white/[0.02]",
+                "relative flex items-center gap-3 overflow-hidden rounded-md border px-3.5 py-2.5 transition-colors duration-300",
+                active && "border-ember/40 bg-raised",
+                done && "border-edge bg-surface",
+                stepFailed && "border-rust/40 bg-raised",
+                !active && !done && !stepFailed && "border-transparent bg-transparent",
               )}
             >
-              <step.icon className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
-              <StepIcon done={done} active={active} failed={!!stepFailed} />
-              <span className={cn("font-medium", active && "text-primary")}>{step.label}</span>
+              {/* Ember scan-line across the active layer. */}
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute inset-y-0 left-0 w-1/3 animate-scan bg-gradient-to-r from-transparent via-[hsl(var(--ember)/0.12)] to-transparent"
+                />
+              )}
+
+              <span
+                className={cn(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  done && "border-moss/50 bg-moss/15 text-moss",
+                  active && "animate-breathe border-ember bg-ember/15 text-ember",
+                  stepFailed && "border-rust/50 bg-rust/15 text-rust",
+                  !done && !active && !stepFailed && "border-edge text-ink-3",
+                )}
+              >
+                {done ? (
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                ) : stepFailed ? (
+                  <X className="h-3 w-3" strokeWidth={3} />
+                ) : (
+                  <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-ember" : "bg-ink-3/50")} />
+                )}
+              </span>
+
+              <span
+                className={cn(
+                  "text-sm font-medium",
+                  active ? "text-ink" : done ? "text-ink-2" : stepFailed ? "text-rust" : "text-ink-3",
+                )}
+              >
+                {step.label}
+              </span>
+              <span className="ml-auto hidden font-mono text-[11px] text-ink-3 sm:block">
+                {step.detail}
+              </span>
             </li>
           );
         })}
       </ol>
 
       {failed && job.error && (
-        <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-400">
+        <p className="mt-4 rounded-md border border-rust/25 bg-raised px-3.5 py-2.5 font-mono text-[13px] text-rust">
           {job.error}
         </p>
       )}

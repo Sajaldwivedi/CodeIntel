@@ -1,29 +1,49 @@
 /** @type {import('tailwindcss').Config} */
-// Dark-first, glassmorphic design system. Custom keyframes live here (rather
-// than in a CSS file) so component styling stays Tailwind-only.
+// STRATA design system — warm graphite strata, single ember accent,
+// depth as luminance, light from above. Tokens live in src/index.css.
 export default {
   darkMode: ["class"],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {
       center: true,
-      padding: "2rem",
-      screens: { "2xl": "1400px" },
+      padding: "1.5rem",
+      screens: { "2xl": "1440px" },
     },
     extend: {
       fontFamily: {
-        sans: [
-          "Inter",
-          "ui-sans-serif",
-          "system-ui",
-          "-apple-system",
-          "Segoe UI",
-          "Roboto",
-          "sans-serif",
-        ],
-        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        display: ['"Bricolage Grotesque"', "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['"Instrument Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
+        // Strata (back → front)
+        bedrock: "hsl(var(--background))",
+        surface: "hsl(var(--surface))",
+        raised: "hsl(var(--raised))",
+        overlay: "hsl(var(--overlay))",
+        // Ink
+        ink: {
+          DEFAULT: "hsl(var(--foreground))",
+          2: "hsl(var(--text-2))",
+          3: "hsl(var(--text-3))",
+        },
+        // Hairlines
+        edge: {
+          DEFAULT: "hsl(var(--border))",
+          strong: "hsl(var(--border-strong))",
+        },
+        // Heat + status
+        ember: {
+          DEFAULT: "hsl(var(--ember))",
+          bright: "hsl(var(--ember-bright))",
+        },
+        "on-ember": "hsl(var(--on-ember))",
+        moss: "hsl(var(--moss))",
+        gold: "hsl(var(--gold))",
+        rust: "hsl(var(--rust))",
+
+        // shadcn compatibility
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -55,60 +75,49 @@ export default {
         },
       },
       borderRadius: {
-        xl: "calc(var(--radius) + 4px)",
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        // 6 · 10 · 14 · 20 scale
+        sm: "6px",
+        md: "10px",
+        lg: "14px",
+        xl: "20px",
       },
       boxShadow: {
-        glow: "0 0 40px -10px hsl(var(--primary) / 0.5)",
-        "glow-lg": "0 0 80px -20px hsl(var(--primary) / 0.6)",
-        card: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 30px -12px rgba(0,0,0,0.7)",
-      },
-      backgroundImage: {
-        "grid-pattern":
-          "linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
-        "brand-gradient":
-          "linear-gradient(135deg, hsl(263 90% 63%), hsl(295 85% 62%), hsl(190 95% 55%))",
+        // Depth rules: light from above; shadows fall down.
+        stratum: "inset 0 1px 0 hsl(36 20% 93% / 0.04), 0 1px 2px hsl(0 0% 0% / 0.4)",
+        raised: "inset 0 1px 0 hsl(36 20% 93% / 0.05), 0 8px 24px -12px hsl(0 0% 0% / 0.6)",
+        overlay: "0 24px 64px -24px hsl(0 0% 0% / 0.7)",
+        "ember-glow": "0 8px 32px -8px hsl(var(--ember) / 0.35)",
       },
       keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-        aurora: {
-          "0%, 100%": { transform: "translate(0px, 0px) scale(1)", opacity: "0.5" },
-          "33%": { transform: "translate(30px, -40px) scale(1.1)", opacity: "0.7" },
-          "66%": { transform: "translate(-20px, 20px) scale(0.95)", opacity: "0.4" },
+        // Live heat: anything the AI is doing right now breathes.
+        breathe: {
+          "0%, 100%": { opacity: "0.55" },
+          "50%": { opacity: "1" },
         },
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
-        "gradient-x": {
-          "0%, 100%": { "background-position": "0% 50%" },
-          "50%": { "background-position": "100% 50%" },
+        // Ember scan-line for active ingestion stages.
+        scan: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(200%)" },
         },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
+        // Slow ambient thermal drift in the bedrock.
+        thermal: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(-4%, 3%) scale(1.06)" },
         },
-        "pulse-ring": {
-          "0%": { transform: "scale(0.8)", opacity: "0.8" },
-          "100%": { transform: "scale(2.2)", opacity: "0" },
+        "caret-blink": {
+          "0%, 70%, 100%": { opacity: "1" },
+          "20%, 50%": { opacity: "0" },
         },
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        aurora: "aurora 18s ease-in-out infinite",
-        shimmer: "shimmer 2s infinite",
-        "gradient-x": "gradient-x 6s ease infinite",
-        float: "float 6s ease-in-out infinite",
-        "pulse-ring": "pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        breathe: "breathe 2s ease-in-out infinite",
+        shimmer: "shimmer 1.8s infinite",
+        scan: "scan 1.6s ease-in-out infinite",
+        thermal: "thermal 18s ease-in-out infinite",
+        "caret-blink": "caret-blink 1.1s steps(1) infinite",
       },
     },
   },

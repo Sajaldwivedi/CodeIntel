@@ -7,29 +7,17 @@ interface HealthBadgeProps {
   label: string;
 }
 
-const VARIANT_STYLES: Record<Variant, string> = {
-  loading: "bg-muted text-muted-foreground",
-  success: "bg-emerald-100 text-emerald-700",
-  error: "bg-destructive/10 text-destructive",
+const DOT_STYLES: Record<Variant, string> = {
+  loading: "animate-breathe bg-ember",
+  success: "bg-moss",
+  error: "bg-rust",
 };
 
 /** Small status pill used to surface backend connectivity. */
 export function HealthBadge({ variant, label }: HealthBadgeProps) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium",
-        VARIANT_STYLES[variant],
-      )}
-    >
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full",
-          variant === "success" && "bg-emerald-500",
-          variant === "error" && "bg-destructive",
-          variant === "loading" && "animate-pulse bg-muted-foreground",
-        )}
-      />
+    <span className="inline-flex items-center gap-2 rounded-full border border-edge bg-raised px-3 py-1 font-mono text-xs text-ink-2">
+      <span className={cn("h-1.5 w-1.5 rounded-full", DOT_STYLES[variant])} />
       {label}
     </span>
   );

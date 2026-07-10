@@ -74,7 +74,7 @@ export function CommandPalette() {
                 })
               }
             >
-              <span className="text-muted-foreground">{repo.owner}/</span>
+              <span className="text-ink-3">{repo.owner}/</span>
               {repo.name}
             </CommandItem>
           ))}

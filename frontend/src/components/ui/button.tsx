@@ -4,28 +4,34 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/utils/cn";
 
+/*
+ * STRATA buttons. One ember-filled primary per view; everything else is
+ * stone. All buttons compress on press (scale 0.98, "snap" feel).
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[transform,background-color,border-color,box-shadow,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bedrock disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98]",
   {
     variants: {
       variant: {
+        // Heat: dark ink on ember, subtle glow.
         default:
-          "bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:brightness-110",
-        gradient:
-          "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 text-white shadow-lg shadow-fuchsia-500/20 hover:shadow-fuchsia-500/40 hover:brightness-110 bg-[length:200%_auto] hover:bg-right",
-        secondary: "border border-white/10 bg-white/5 text-foreground hover:bg-white/10",
-        ghost: "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-        outline: "border border-white/10 bg-transparent hover:bg-white/5 hover:text-foreground",
+          "bg-ember text-on-ember shadow-ember-glow hover:bg-ember-bright",
+        secondary:
+          "border border-edge bg-raised text-ink shadow-stratum hover:border-edge-strong hover:bg-overlay",
+        ghost: "text-ink-2 hover:bg-raised hover:text-ink",
+        outline:
+          "border border-edge bg-transparent text-ink hover:border-edge-strong hover:bg-raised",
+        // Rust outline that fills on hover — destructive is never loud at rest.
         destructive:
-          "bg-destructive text-destructive-foreground shadow-lg shadow-destructive/20 hover:brightness-110",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border border-rust/40 bg-transparent text-rust hover:bg-rust hover:text-ink hover:border-rust",
+        link: "text-ember underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-12 rounded-xl px-6 text-base",
+        sm: "h-8 rounded-sm px-3 text-[13px]",
+        lg: "h-12 rounded-md px-6 text-base",
         icon: "h-10 w-10",
-        "icon-sm": "h-8 w-8",
+        "icon-sm": "h-8 w-8 rounded-sm",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
