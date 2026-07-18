@@ -125,7 +125,10 @@ export function DashboardPage() {
         title="Dashboard"
         description="Your indexed repositories and recent activity, at rest."
         actions={
-          <Button onClick={() => navigate("/upload")}>
+          <Button
+            onClick={() => navigate("/upload")}
+            className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition-all duration-300 hover:shadow-[0_0_15px_-3px_rgba(249,115,22,0.4)]"
+          >
             <Plus />
             Add repository
           </Button>
@@ -278,7 +281,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="mt-4 p-5">
+          <Card className="mt-4 p-5 transition-all duration-200 hover:border-zinc-700/50 hover:bg-zinc-900/50">
             <Overline>Ask the codebase</Overline>
             <p className="mt-2.5 text-sm leading-relaxed text-ink-2">
               Jump straight into a conversation with your selected repository.

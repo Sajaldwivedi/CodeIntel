@@ -12,6 +12,7 @@ export default {
     },
     extend: {
       fontFamily: {
+        inter: ['"Inter"', "ui-sans-serif", "system-ui", "sans-serif"],
         display: ['"Bricolage Grotesque"', "ui-sans-serif", "system-ui", "sans-serif"],
         sans: ['"Instrument Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
@@ -83,8 +84,8 @@ export default {
       },
       boxShadow: {
         // Depth rules: light from above; shadows fall down.
-        stratum: "inset 0 1px 0 hsl(36 20% 93% / 0.04), 0 1px 2px hsl(0 0% 0% / 0.4)",
-        raised: "inset 0 1px 0 hsl(36 20% 93% / 0.05), 0 8px 24px -12px hsl(0 0% 0% / 0.6)",
+        stratum: "inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 1px 2px hsl(0 0% 0% / 0.4)",
+        raised: "inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 8px 24px -12px hsl(0 0% 0% / 0.6)",
         overlay: "0 24px 64px -24px hsl(0 0% 0% / 0.7)",
         "ember-glow": "0 8px 32px -8px hsl(var(--ember) / 0.35)",
       },

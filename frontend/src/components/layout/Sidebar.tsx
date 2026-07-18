@@ -23,7 +23,7 @@ export function Sidebar() {
       initial={false}
       animate={{ width: collapsed ? 72 : 264 }}
       transition={settle}
-      className="sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-edge bg-surface md:flex"
+      className="sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-edge bg-bedrock md:flex"
     >
       <div className={cn("flex h-16 items-center border-b border-edge px-5", collapsed && "justify-center px-0")}>
         {collapsed ? <Logo showWordmark={false} to="/" /> : <Logo to="/" />}
@@ -39,9 +39,11 @@ export function Sidebar() {
                   to={item.to}
                   className={({ isActive }) =>
                     cn(
-                      "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       collapsed && "justify-center px-0 py-2.5",
-                      isActive ? "bg-raised text-ink" : "text-ink-2 hover:bg-raised/60 hover:text-ink",
+                      isActive
+                        ? "bg-zinc-800/50 text-zinc-50"
+                        : "text-zinc-400 hover:bg-zinc-900/30 hover:text-zinc-100",
                     )
                   }
                 >

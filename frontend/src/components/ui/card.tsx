@@ -3,10 +3,17 @@ import * as React from "react";
 import { cn } from "@/utils/cn";
 import { useSpotlight } from "@/hooks/useSpotlight";
 
-/** Stratum 1 surface: warm graphite, hairline border, top highlight. */
+/** Static card surface: deep zinc fill, hairline border, top highlight. */
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("stratum rounded-lg", className)} {...props} />
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-xl border border-white/5 bg-zinc-900/30 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 Card.displayName = "Card";
@@ -29,8 +36,8 @@ const SpotlightCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
         className={cn(
-          "stratum spotlight relative rounded-lg transition-[transform,border-color,box-shadow] duration-200",
-          "hover:-translate-y-0.5 hover:border-edge-strong hover:shadow-raised",
+          "spotlight relative rounded-xl border border-white/5 bg-zinc-900/30 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+          "transition-all duration-200 hover:border-zinc-700/50 hover:bg-zinc-900/50",
           className,
         )}
         {...props}

@@ -31,7 +31,7 @@ export function StatCard({ label, value, icon, delta, live = false }: StatCardPr
         <div className="mt-3 flex items-baseline gap-2.5">
           <span
             className={cn(
-              "tnum font-display text-[28px] font-semibold leading-none tracking-tight text-ink",
+              "tnum font-sans text-[28px] font-semibold leading-none tracking-tight text-ink",
               live && "animate-breathe text-ember",
             )}
           >

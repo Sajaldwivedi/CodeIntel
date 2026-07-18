@@ -15,21 +15,21 @@
    ──────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* Strata (back → front) */
-    --background: 20 14% 4.2%;
-    --surface: 22 12% 6.8%;
-    --raised: 24 10% 9.5%;
-    --overlay: 24 10% 12%;
+    /* Strata (back → front) — deep zinc, matching the landing page. */
+    --background: 240 10% 3.9%;
+    --surface: 240 7% 5.5%;
+    --raised: 240 6% 9%;
+    --overlay: 240 6% 12%;
 
-    /* Hairlines */
-    --border: 26 10% 15.5%;
-    --border-strong: 26 12% 22%;
-    --input: 26 10% 15.5%;
+    /* Hairlines — hairline-thin, reads as white/5 on zinc-950. */
+    --border: 240 6% 11%;
+    --border-strong: 240 5% 18%;
+    --input: 240 6% 11%;
 
-    /* Ink */
-    --foreground: 36 20% 93%;
-    --text-2: 30 8% 64%;
-    --text-3: 28 6% 45%;
+    /* Ink — zinc-50 / zinc-400 / zinc-500 */
+    --foreground: 240 6% 97%;
+    --text-2: 240 5% 65%;
+    --text-3: 240 4% 46%;
 
     /* Ember — the single accent. Text on ember is dark ink, not white. */
     --ember: 24 92% 58%;
@@ -162,9 +162,9 @@
   /* Signature: mono overline label — the engineer's blueprint annotation. */
   .overline-label {
     font-family: "IBM Plex Mono", ui-monospace, monospace;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.14em;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: hsl(var(--text-3));
   }
@@ -174,7 +174,7 @@
     background-color: hsl(var(--surface));
     border: 1px solid hsl(var(--border));
     box-shadow:
-      inset 0 1px 0 hsl(36 20% 93% / 0.04),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.05),
       0 1px 2px hsl(0 0% 0% / 0.4);
   }
   .light .stratum {
